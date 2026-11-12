@@ -17,7 +17,8 @@ from app.schemas.course import (
     JoinCourseRequest,
     StudentRead,
 )
-from app.services import course_service
+from app.schemas.dashboard import CourseStats
+from app.services import course_service, dashboard_service
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -72,3 +73,8 @@ def leave_course(course_id: int, db: DbSession, user: StudentUser) -> None:
 def new_join_code(course: OwnedCourse, db: DbSession, user: CurrentUser):
     """Generate another enrollment code; the old one stops working."""
     return CourseRead.for_viewer(course_service.regenerate_join_code(db, course), user)
+
+
+@router.get("/{course_id}/stats", response_model=CourseStats)
+def get_course_stats(course: OwnedCourse, db: DbSession):
+    return dashboard_service.course_stats(db, course)

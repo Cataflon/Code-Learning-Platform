@@ -111,6 +111,19 @@ MATRIX = [
     ("classmate", "GET", SUBMISSION, None, 404),
     ("outsider", "GET", SUBMISSION, None, 404),
     ("other_teacher", "GET", SUBMISSION, None, 404),
+    # --- dashboards and statistics
+    ("anonymous", "GET", "/me/dashboard", None, 401),
+    ("member", "GET", "/me/dashboard", None, 200),
+    ("owner", "GET", "/me/dashboard", None, 403),
+    ("anonymous", "GET", "/users/me/activity", None, 401),
+    ("member", "GET", "/users/me/activity", None, 200),
+    ("owner", "GET", "/users/me/activity", None, 200),
+    ("member", "GET", ASSIGNMENT + "/stats", None, 403),
+    ("other_teacher", "GET", ASSIGNMENT + "/stats", None, 404),
+    ("owner", "GET", ASSIGNMENT + "/stats", None, 200),
+    ("member", "GET", COURSE + "/stats", None, 403),
+    ("other_teacher", "GET", COURSE + "/stats", None, 404),
+    ("owner", "GET", COURSE + "/stats", None, 200),
 ]
 
 

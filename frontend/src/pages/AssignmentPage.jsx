@@ -156,7 +156,8 @@ export default function AssignmentPage() {
   });
   const attemptsQuery = useQuery({
     queryKey: ["submissions", assignmentId],
-    queryFn: () => listSubmissions(assignmentId),
+    // A student has at most max_submissions attempts, so one page holds them all.
+    queryFn: () => listSubmissions(assignmentId, { page_size: 100 }),
   });
 
   // The draft lives only in this browser (localStorage); the server never sees it.
@@ -165,7 +166,7 @@ export default function AssignmentPage() {
     localStorage.setItem(draftKey(assignmentId), code);
   }, [assignmentId, code]);
 
-  const attempts = attemptsQuery.data ?? [];
+  const attempts = attemptsQuery.data?.items ?? [];
   const [selectedId, setSelectedId] = useState(null);
   const activeId = selectedId ?? attempts[0]?.id ?? null;
   const submissionQuery = useSubmission(activeId);

@@ -4,6 +4,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.course import ConceptRead
 
+
+class ResultBuckets(BaseModel):
+    """Students by their best result on an assignment."""
+
+    full: int = 0  # passed every test
+    partial: int = 0
+    none: int = 0
+
+
 MAX_TEXT = 64 * 1024  # 64 KB for test input/output
 
 
@@ -47,6 +56,10 @@ class AssignmentRead(BaseModel):
     created_at: datetime
     # Filled in only for the student who is asking.
     submissions_left: int | None = None
+    # Filled in only for the course teacher, in the course's assignment list.
+    submitted_count: int | None = None
+    enrolled_count: int | None = None
+    result_buckets: ResultBuckets | None = None
 
 
 class TestCaseCreate(BaseModel):

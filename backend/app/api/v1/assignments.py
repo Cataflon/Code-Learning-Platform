@@ -11,8 +11,14 @@ from app.core.deps import (
     OwnedCourse,
 )
 from app.models import Role
-from app.schemas.assignment import AssignmentCreate, AssignmentRead, AssignmentUpdate
-from app.services import assignment_service, submission_service
+from app.schemas.assignment import (
+    AssignmentCreate,
+    AssignmentRead,
+    AssignmentUpdate,
+    ResultBuckets,
+)
+from app.schemas.dashboard import AssignmentStats
+from app.services import assignment_service, dashboard_service, submission_service
 
 router = APIRouter(tags=["assignments"])
 
@@ -25,7 +31,23 @@ def list_assignments(
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
-    return assignment_service.list_assignments(db, course, user, limit, offset)
+    assignments = assignment_service.list_assignments(db, course, user, limit, offset)
+    if user.role != Role.teacher:
+        return assignments
+    # The teacher's list also says how many students submitted and how they did.
+    overview = dashboard_service.assignment_overview(db, course)
+    enrolled = len(course.enrollments)
+    items = []
+    for assignment in assignments:
+        read = AssignmentRead.model_validate(assignment)
+        submitted, buckets = overview.get(assignment.id, (0, ResultBuckets()))
+        read.submitted_count, read.result_buckets, read.enrolled_count = (
+            submitted,
+            buckets,
+            enrolled,
+        )
+        items.append(read)
+    return items
 
 
 @router.post(
@@ -53,3 +75,9 @@ def update_assignment(data: AssignmentUpdate, assignment: OwnedAssignment, db: D
 @router.delete("/assignments/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_assignment(assignment: OwnedAssignment, db: DbSession) -> None:
     assignment_service.delete_assignment(db, assignment)
+
+
+@router.get("/assignments/{assignment_id}/stats", response_model=AssignmentStats)
+def get_assignment_stats(assignment: OwnedAssignment, db: DbSession):
+    """Pass rate per test and score distribution, from each student's best submission."""
+    return dashboard_service.assignment_stats(db, assignment)

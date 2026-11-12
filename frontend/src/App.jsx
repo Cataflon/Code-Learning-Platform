@@ -7,11 +7,16 @@ import ProtectedRoute from "./auth/ProtectedRoute.jsx";
 import AppLayout from "./components/AppLayout.jsx";
 import AssignmentPage from "./pages/AssignmentPage.jsx";
 import CoursesPage from "./pages/CoursesPage.jsx";
-import HomePage from "./pages/HomePage.jsx";
+import CoursePage from "./pages/CoursePage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
+import ProfilePage from "./pages/ProfilePage.jsx";
 import RegisterPage from "./pages/RegisterPage.jsx";
 import StatusPage from "./pages/StatusPage.jsx";
+import StudentDashboard from "./pages/StudentDashboard.jsx";
+import AssignmentEditor from "./pages/teacher/AssignmentEditor.jsx";
+import SubmissionsPage from "./pages/teacher/SubmissionsPage.jsx";
+import TeacherCoursesPage from "./pages/teacher/TeacherCoursesPage.jsx";
 
 /** Same path, different page per role. */
 function ByRole({ student, teacher }) {
@@ -33,13 +38,22 @@ export function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/" element={<RootRedirect />} />
-          <Route path="/dashboard" element={<HomePage />} />
           <Route
             path="/courses"
-            element={<ByRole student={<CoursesPage />} teacher={<HomePage />} />}
+            element={<ByRole student={<CoursesPage />} teacher={<TeacherCoursesPage />} />}
           />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route element={<ProtectedRoute roles={["student"]} />}>
+            <Route path="/dashboard" element={<StudentDashboard />} />
             <Route path="/assignments/:assignmentId" element={<AssignmentPage />} />
+          </Route>
+          <Route element={<ProtectedRoute roles={["teacher"]} />}>
+            <Route path="/courses/:courseId" element={<CoursePage />} />
+            <Route path="/teacher/assignments/:assignmentId/edit" element={<AssignmentEditor />} />
+            <Route
+              path="/teacher/assignments/:assignmentId/submissions"
+              element={<SubmissionsPage />}
+            />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Route>

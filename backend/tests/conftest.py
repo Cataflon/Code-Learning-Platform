@@ -6,6 +6,7 @@ other's data.
 """
 
 from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,9 +19,22 @@ from app.core.security import create_access_token, hash_password
 from app.db.base import Base
 from app.db.session import get_background_session_factory, get_db
 from app.main import create_app
-from app.models import Assignment, Concept, Course, Enrollment, Role, TestCase, User
+from app.models import (
+    Assignment,
+    Concept,
+    Course,
+    Enrollment,
+    Role,
+    Submission,
+    SubmissionStatus,
+    TestCase,
+    TestResult,
+    User,
+    Verdict,
+)
 from app.runner.factory import get_runner
 from app.services.course_service import generate_join_code
+from app.services.scoring import compute_score, count_passed
 from tests.fakes import FakeRunner
 
 TEST_DATABASE = "autograder_test"
@@ -193,6 +207,59 @@ def make_test_case(db_session: Session) -> Callable[..., TestCase]:
         return test_case
 
     return _make_test_case
+
+
+@pytest.fixture
+def make_submission(db_session: Session) -> Callable[..., Submission]:
+    """A stored submission with the given verdicts, as if the tests had already run.
+
+    ``verdicts`` is one entry per test of the assignment, in test order: True/False, or a
+    Verdict. ``status`` other than done stores no results.
+    """
+
+    def _make_submission(
+        student: User,
+        assignment: Assignment,
+        verdicts: list[bool | Verdict] | None = None,
+        status: SubmissionStatus = SubmissionStatus.done,
+        created_at: datetime | None = None,
+        code: str = "print(1)",
+    ) -> Submission:
+        tests = list(assignment.test_cases)
+        submission = Submission(
+            assignment_id=assignment.id,
+            student_id=student.id,
+            code=code,
+            status=status,
+            total_count=len(tests),
+            created_at=created_at or datetime.now(UTC),
+        )
+        db_session.add(submission)
+        db_session.flush()
+        if status == SubmissionStatus.done:
+            given = verdicts if verdicts is not None else [True] * len(tests)
+            assert len(given) == len(tests), "one verdict per test"
+            by_test = {}
+            for test_case, value in zip(tests, given, strict=True):
+                if isinstance(value, bool):
+                    value = Verdict.passed if value else Verdict.wrong_answer
+                by_test[test_case.id] = value
+                db_session.add(
+                    TestResult(
+                        submission_id=submission.id,
+                        test_case_id=test_case.id,
+                        verdict=value,
+                        runtime_ms=30,
+                    )
+                )
+            submission.score = compute_score(by_test, {t.id: t.weight for t in tests})
+            submission.passed_count = count_passed(by_test.values())
+            submission.finished_at = submission.created_at
+        db_session.commit()
+        db_session.refresh(submission)
+        return submission
+
+    return _make_submission
 
 
 @pytest.fixture
