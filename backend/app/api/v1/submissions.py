@@ -13,8 +13,10 @@ from app.core.deps import (
 from app.db.session import get_background_session_factory
 from app.runner.base import Runner
 from app.runner.factory import get_run_slots, get_runner
-from app.schemas.submission import SubmissionCreate, SubmissionRead, SubmissionSummary
-from app.services import submission_service
+from app.schemas.dashboard import SubmissionPage
+from app.schemas.submission import SubmissionCreate, SubmissionRead
+from app.services import dashboard_service, submission_service
+from app.services.dashboard_service import VerdictFilter
 from app.services.submission_runner import run_submission
 
 router = APIRouter(tags=["submissions"])
@@ -43,16 +45,18 @@ def create_submission(
     return submission_service.to_read(db, submission, user)
 
 
-@router.get("/assignments/{assignment_id}/submissions", response_model=list[SubmissionSummary])
+@router.get("/assignments/{assignment_id}/submissions", response_model=SubmissionPage)
 def list_submissions(
     assignment: MemberAssignment,
     db: DbSession,
     user: CurrentUser,
-    limit: Annotated[int, Query(ge=1, le=200)] = 100,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    verdict: VerdictFilter = "all",
+    q: Annotated[str | None, Query(max_length=100)] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
 ):
-    submissions = submission_service.list_submissions(db, assignment, user, limit, offset)
-    return submission_service.to_summaries(db, submissions)
+    """Student: their own attempts. Teacher: the class, filtered, searched and paginated."""
+    return dashboard_service.search_submissions(db, assignment, user, verdict, q, page, page_size)
 
 
 @router.get("/submissions/{submission_id}", response_model=SubmissionRead)

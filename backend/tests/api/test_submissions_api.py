@@ -115,7 +115,8 @@ def test_other_student_cannot_read_a_submission(client, auth, setup, make_user, 
     listed = client.get(f"{API}/assignments/{assignment.id}/submissions", headers=auth(classmate))
 
     assert response.status_code == 404
-    assert listed.json() == []
+    assert listed.json()["items"] == []
+    assert listed.json()["total"] == 0
 
 
 def test_empty_and_oversized_code_are_rejected(client, auth, setup):
@@ -147,8 +148,10 @@ def test_list_returns_own_attempts_newest_first(client, auth, setup):
     for _ in range(2):
         client.post(url, json={"code": "print(1)"}, headers=auth(student))
 
-    listed = client.get(url, headers=auth(student)).json()
+    page = client.get(url, headers=auth(student)).json()
+    listed = page["items"]
 
+    assert page["total"] == 2
     assert [item["attempt_number"] for item in listed] == [2, 1]
     assert "code" not in listed[0]
     assert listed[0]["verdicts"] == ["passed", "wrong_answer"]
