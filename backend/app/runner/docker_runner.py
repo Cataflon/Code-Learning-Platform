@@ -29,6 +29,7 @@ from docker.types import LogConfig
 from app.runner.base import Limits, RunResult, truncate_output
 
 LABEL = {"autograder": "1"}
+SIGKILL_EXIT_CODE = 137  # 128 + signal 9
 COMMAND = ["sh", "-c", "exec python /sandbox/main.py < /sandbox/input.txt"]
 
 
@@ -113,8 +114,7 @@ class DockerRunner:
         if not timed_out and runtime_ms > limits.time_limit_ms:
             # It finished inside the startup margin but ran longer than the limit allows.
             timed_out = True
-        # Exit code 137 alone is not enough: it also appears after our own kill().
-        memory_exceeded = bool(state.get("OOMKilled")) and not timed_out
+        memory_exceeded = is_memory_kill(state, exit_code, timed_out)
 
         stdout = container.logs(stdout=True, stderr=False).decode("utf-8", errors="replace")
         stderr = container.logs(stdout=False, stderr=True).decode("utf-8", errors="replace")
@@ -130,6 +130,20 @@ class DockerRunner:
     def leftover_containers(self) -> list:
         """Containers created by this runner that still exist (should always be empty)."""
         return self.client.containers.list(all=True, filters={"label": "autograder=1"})
+
+
+def is_memory_kill(state: dict, exit_code: int | None, timed_out: bool) -> bool:
+    """Was the program stopped by the kernel for exceeding its memory limit?
+
+    Docker's ``OOMKilled`` flag is the direct signal, but it is reported asynchronously and
+    is sometimes still false right after the container exits (seen on Linux with cgroup v2).
+    Exit code 137 means "killed by SIGKILL". When we did not send that signal ourselves
+    (no timeout), the only sender left is the kernel's OOM killer: the program is PID 1 in
+    its own namespace, so it cannot SIGKILL itself, and nothing else can reach it.
+    """
+    if timed_out:
+        return False  # 137 here comes from our own kill()
+    return bool(state.get("OOMKilled")) or exit_code == SIGKILL_EXIT_CODE
 
 
 def _parse_docker_time(value: str | None) -> datetime | None:

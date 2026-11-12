@@ -67,7 +67,7 @@ Câte un rezumat scurt pe pas: ce s-a construit și de ce. Deciziile mari au și
 - Un container nou pe test, șters în `finally`, cu eticheta `autograder=1`; după fiecare test Docker se verifică automat că nu a rămas niciunul.
 - Limitele (D12): fără rețea, memorie și swap egale cu limita temei, 0,5 CPU, 64 de procese, rootfs doar pentru citire cu `/tmp` de 16 MB în memorie, `cap_drop=ALL`, `no-new-privileges`, uid 10001, loguri limitate la 1 MB, output trunchiat la 64 KB.
 - D9 (vezi `docs/adr/0001-livrare-cod.md`): codul ajunge în container printr-un director temporar montat doar pentru citire. `put_archive` nu merge cu rootfs `read_only`.
-- Memoria depășită se detectează din `State.OOMKilled`, nu din codul 137, care apare și după `kill()` la timeout. Comanda folosește `exec`, ca Python să fie procesul principal.
+- Memoria depășită se detectează din `State.OOMKilled` sau din codul de ieșire 137 atunci când nu noi am oprit containerul. În CI (Linux, cgroup v2) fanionul `OOMKilled` a rămas o dată fals deși nucleul omorâse procesul, de aceea nu ne bazăm doar pe el. După un timeout, 137 vine din `kill()`-ul nostru și nu se consideră memorie. Comanda folosește `exec`, ca Python să fie procesul principal.
 - Timpul raportat e durata containerului (`StartedAt`–`FinishedAt`); așteptarea maximă e limita temei plus marja de pornire de 2 s.
 - `RUNNER=docker` e implicit; `RUNNER=subprocess` e refuzat la validarea configurării dacă `ENV` nu e `dev`.
 - Un semafor global (`MAX_CONCURRENT_RUNS`, implicit 2) limitează evaluările simultane, deci și containerele.
