@@ -73,3 +73,18 @@ Câte un rezumat scurt pe pas: ce s-a construit și de ce. Deciziile mari au și
 - Un semafor global (`MAX_CONCURRENT_RUNS`, implicit 2) limitează evaluările simultane, deci și containerele.
 - D10: backend-ul rămâne pe gazdă; Python 3.12 în sandbox, fără biblioteci externe.
 - Suita de contract rulează aceleași 14 programe pe ambele runner-e; suita adversarială are 16 teste. În CI se construiește imaginea și se rulează și testele cu markerul `docker`.
+
+## Pasul 5 · Execuție asincronă și pagina temei
+
+- `POST /assignments/{id}/submissions` creează trimiterea `queued`, programează `run_submission` cu `BackgroundTasks` și răspunde 202 imediat (măsurat: circa 40 ms). Clientul interoghează `GET /submissions/{id}` o dată pe secundă până la `done` sau `error`.
+- D8: `BackgroundTasks` cu semafor, fără worker separat. `run_submission` primește doar id-ul, deci poate fi mutată într-un worker fără modificări.
+- Funcția din fundal își deschide propria sesiune de bază de date: sesiunea cererii se închide odată cu răspunsul.
+- Semaforul (`MAX_CONCURRENT_RUNS`, implicit 2) e ținut pe toată durata unei evaluări. O trimitere rulează testele pe rând, deci semaforul limitează și numărul de containere.
+- La pornire (`lifespan`), trimiterile rămase `queued` sau `running` devin `error` cu mesaj clar, iar containerele de sandbox rămase de la un server oprit forțat sunt șterse. Verificat manual: server oprit în timpul unei rulări, apoi repornit.
+- Între două trimiteri ale aceluiași student la aceeași temă trebuie să treacă `MIN_SUBMISSION_INTERVAL_S` (implicit 5 secunde), altfel 429 cu antetul `Retry-After`.
+- D16: fără buton separat de rulare de probă; doar „Submit”.
+- Pagina temei urmează macheta 03: enunț în Markdown (`react-markdown`, fără HTML brut), exemple din testele publice, editor Monaco, pătrățelele de verdict, rezultatul pe test cu concept, timp și indiciu.
+- Monaco e împachetat local (doar nucleul și gramatica Python) și încărcat leneș, ca demo-ul să meargă fără internet. Ciorna stă doar în `localStorage`, iar interfața spune asta.
+- Diferență față de machetă: la un test public picat se afișează în plus input-ul, outputul așteptat și cel obținut. Rândul „Limit on n” din machetă nu are câmp în backend; limitele problemei se scriu în enunț.
+- Pagina „Courses” a studentului nu are machetă: listează cursurile cu temele publicate și formularul de înscriere, din aceleași componente.
+- Proxy-ul Vite țintește `127.0.0.1`, nu `localhost`: pe Windows, `localhost` încearcă întâi IPv6 și adaugă circa 2 secunde la fiecare conexiune nouă.
