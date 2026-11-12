@@ -1,10 +1,20 @@
 """Application factory."""
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import health
+from app.api.v1 import assignments, concepts, courses, health, test_cases
 from app.core.config import get_settings
+from app.core.errors import register_error_handlers
+
+
+def build_api_router() -> APIRouter:
+    api = APIRouter(prefix="/api/v1")
+    api.include_router(courses.router)
+    api.include_router(concepts.router)
+    api.include_router(assignments.router)
+    api.include_router(test_cases.router)
+    return api
 
 
 def create_app() -> FastAPI:
@@ -17,8 +27,10 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    register_error_handlers(app)
     # /health lives outside /api/v1 on purpose (see the API contract).
     app.include_router(health.router)
+    app.include_router(build_api_router())
     return app
 
 
