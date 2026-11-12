@@ -45,6 +45,8 @@ class AssignmentRead(BaseModel):
     test_count: int
     hidden_test_count: int
     created_at: datetime
+    # Filled in only for the student who is asking.
+    submissions_left: int | None = None
 
 
 class TestCaseCreate(BaseModel):

@@ -17,8 +17,13 @@ from sqlalchemy.orm import Session
 from app.core.errors import NotFoundError, PermissionDeniedError, UnauthorizedError
 from app.core.security import decode_token
 from app.db.session import get_db
-from app.models import Assignment, Course, Role, TestCase, User
-from app.services import assignment_service, course_service, test_case_service
+from app.models import Assignment, Course, Role, Submission, TestCase, User
+from app.services import (
+    assignment_service,
+    course_service,
+    submission_service,
+    test_case_service,
+)
 
 DbSession = Annotated[Session, Depends(get_db)]
 
@@ -98,8 +103,19 @@ def get_test_case_for_owner(test_case_id: int, db: DbSession, user: TeacherUser)
     return test_case
 
 
+def get_submission_for_viewer(submission_id: int, db: DbSession, user: CurrentUser) -> Submission:
+    """The submission, if the user wrote it or teaches the course it belongs to."""
+    submission = submission_service.get_submission(db, submission_id)
+    is_author = submission.student_id == user.id
+    is_course_teacher = submission.assignment.course.teacher_id == user.id
+    if not (is_author or is_course_teacher):
+        raise NotFoundError("Submission not found")
+    return submission
+
+
 MemberCourse = Annotated[Course, Depends(get_course_for_member)]
 OwnedCourse = Annotated[Course, Depends(get_course_for_owner)]
 MemberAssignment = Annotated[Assignment, Depends(get_assignment_for_member)]
 OwnedAssignment = Annotated[Assignment, Depends(get_assignment_for_owner)]
 OwnedTestCase = Annotated[TestCase, Depends(get_test_case_for_owner)]
+ViewableSubmission = Annotated[Submission, Depends(get_submission_for_viewer)]

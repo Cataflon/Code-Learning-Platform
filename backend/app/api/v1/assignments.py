@@ -10,8 +10,9 @@ from app.core.deps import (
     OwnedAssignment,
     OwnedCourse,
 )
+from app.models import Role
 from app.schemas.assignment import AssignmentCreate, AssignmentRead, AssignmentUpdate
-from app.services import assignment_service
+from app.services import assignment_service, submission_service
 
 router = APIRouter(tags=["assignments"])
 
@@ -37,8 +38,11 @@ def create_assignment(data: AssignmentCreate, course: OwnedCourse, db: DbSession
 
 
 @router.get("/assignments/{assignment_id}", response_model=AssignmentRead)
-def get_assignment(assignment: MemberAssignment):
-    return assignment
+def get_assignment(assignment: MemberAssignment, db: DbSession, user: CurrentUser):
+    read = AssignmentRead.model_validate(assignment)
+    if user.role == Role.student:
+        read.submissions_left = submission_service.submissions_left(db, user, assignment)
+    return read
 
 
 @router.patch("/assignments/{assignment_id}", response_model=AssignmentRead)

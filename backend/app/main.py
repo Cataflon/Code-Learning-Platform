@@ -3,7 +3,16 @@
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import assignments, auth, concepts, courses, health, test_cases, users
+from app.api.v1 import (
+    assignments,
+    auth,
+    concepts,
+    courses,
+    health,
+    submissions,
+    test_cases,
+    users,
+)
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 
@@ -16,6 +25,7 @@ def build_api_router() -> APIRouter:
     api.include_router(concepts.router)
     api.include_router(assignments.router)
     api.include_router(test_cases.router)
+    api.include_router(submissions.router)
     return api
 
 
