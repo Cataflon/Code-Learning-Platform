@@ -6,6 +6,7 @@ Idempotent: running it twice leaves the same data. Run with ``python -m scripts.
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.security import hash_password
 from app.db.session import get_session_factory
 from app.models import Assignment, Concept, Course, Enrollment, Role, TestCase, User
 
@@ -16,19 +17,16 @@ COURSE_TITLE = "Procedural Programming"
 JOIN_CODE = "PP4K7MAB"
 
 
-def hash_seed_password(password: str) -> str:
-    """Step 1 has no hashing yet; Step 2 replaces this with a real Argon2 hash."""
-    return "!unusable"
-
-
 def get_or_create_user(db: Session, email: str, full_name: str, role: Role) -> User:
     user = db.scalar(select(User).where(User.email == email))
+    if user is not None and not user.password_hash.startswith("$argon2"):
+        user.password_hash = hash_password(SEED_PASSWORD)  # repair a pre-auth placeholder
     if user is None:
         user = User(
             email=email,
             full_name=full_name,
             role=role,
-            password_hash=hash_seed_password(SEED_PASSWORD),
+            password_hash=hash_password(SEED_PASSWORD),
         )
         db.add(user)
         db.flush()

@@ -34,3 +34,16 @@ Câte un rezumat scurt pe pas: ce s-a construit și de ce. Deciziile mari au și
 - Rolul e stocat ca text (enum ne-nativ), ca migrările să nu depindă de tipuri ENUM din PostgreSQL.
 - `join_code` are 8 caractere dintr-un alfabet fără 0/O și 1/I. Câmpurile cerute de machete (`color`, `max_submissions`, `hint`) sunt în model de la început.
 - Testele rulează pe baza `autograder_test`, fiecare într-o tranzacție anulată la final. Un test separat aplică migrările pe o bază goală, verifică cu `alembic check` că modelele și migrările coincid, apoi face downgrade.
+
+## Pasul 2 · Autentificare, roluri și scheletul frontend
+
+- Autentificare fără sesiune pe server: token JWT (HS256) cu `sub`, `role` și `exp`, valabil 60 de minute; fără refresh token în MVP.
+- Parolele sunt hash-uite cu Argon2id prin `pwdlib`; minimum 8 caractere. Login-ul întoarce același mesaj pentru email necunoscut și parolă greșită.
+- D5: contul de profesor cere codul de invitație din `TEACHER_INVITE_CODE`. D7: token-ul stă în `localStorage` (simplu, dar expus la XSS; alternativa cu cookie `httpOnly` ar cere protecție CSRF).
+- Login-ul folosește formularul OAuth2 (`username` poartă emailul), ca butonul „Authorize” din Swagger să funcționeze.
+- Regulile de acces stau în dependențe: fără token 401, rol greșit 403, resursă din alt curs 404 (ca să nu se afle că există). Studentul primește 404 și pentru o temă nepublicată.
+- Matricea de permisiuni e un singur test parametrizat, cu o linie pe (actor, metodă, cale); orice rută nouă adaugă linii.
+- Au intrat și rutele de profil din „Interfață ↔ API”: `PATCH /users/me`, `POST /users/me/password`, `DELETE /courses/{id}/enrollment`, `POST /courses/{id}/join-code`.
+- Frontend: `apiFetch` adaugă token-ul și face logout la 401; `AuthContext` reîncarcă profilul după refresh; `ProtectedRoute` trimite vizitatorul la login și rolul greșit la pagina lui.
+- Componentele comune (`ui.jsx`, `VerdictSquares`, `states.jsx`) reproduc stilul machetelor; iconițele vin din `lucide-react` (dependență în plus față de tabelul de tehnologii).
+- Formularul de înregistrare nu are machetă: folosește același cadru ca pagina Sign in.

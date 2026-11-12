@@ -60,3 +60,15 @@ def delete_course(course: OwnedCourse, db: DbSession) -> None:
 @router.get("/{course_id}/students", response_model=list[StudentRead])
 def list_students(course: OwnedCourse, db: DbSession, limit: Limit = 100, offset: Offset = 0):
     return course_service.list_students(db, course, limit, offset)
+
+
+@router.delete("/{course_id}/enrollment", status_code=status.HTTP_204_NO_CONTENT)
+def leave_course(course_id: int, db: DbSession, user: StudentUser) -> None:
+    """The student leaves the course; their submissions stay in the database."""
+    course_service.leave_course(db, user, course_service.get_course(db, course_id))
+
+
+@router.post("/{course_id}/join-code", response_model=CourseRead)
+def new_join_code(course: OwnedCourse, db: DbSession, user: CurrentUser):
+    """Generate another enrollment code; the old one stops working."""
+    return CourseRead.for_viewer(course_service.regenerate_join_code(db, course), user)

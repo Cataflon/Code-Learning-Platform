@@ -3,13 +3,15 @@
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import assignments, concepts, courses, health, test_cases
+from app.api.v1 import assignments, auth, concepts, courses, health, test_cases, users
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 
 
 def build_api_router() -> APIRouter:
     api = APIRouter(prefix="/api/v1")
+    api.include_router(auth.router)
+    api.include_router(users.router)
     api.include_router(courses.router)
     api.include_router(concepts.router)
     api.include_router(assignments.router)
