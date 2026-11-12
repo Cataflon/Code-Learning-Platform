@@ -88,3 +88,19 @@ Câte un rezumat scurt pe pas: ce s-a construit și de ce. Deciziile mari au și
 - Diferență față de machetă: la un test public picat se afișează în plus input-ul, outputul așteptat și cel obținut. Rândul „Limit on n” din machetă nu are câmp în backend; limitele problemei se scriu în enunț.
 - Pagina „Courses” a studentului nu are machetă: listează cursurile cu temele publicate și formularul de înscriere, din aceleași componente.
 - Proxy-ul Vite țintește `127.0.0.1`, nu `localhost`: pe Windows, `localhost` încearcă întâi IPv6 și adaugă circa 2 secunde la fiecare conexiune nouă.
+
+## Pasul 6 · Dashboard student și vederi profesor
+
+- Datele agregate se calculează în backend, în `services/dashboard_service.py`: o pagină cere un singur endpoint, nu zeci de cereri mici.
+- `GET /me/dashboard` întoarce temele publicate ale cursurilor studentului (ordonate după termen), cel mai bun scor, pătrățelele ultimei încercări, ultimele cinci trimiteri și cifrele din antet. `concepts_to_review` există în răspuns, dar rămâne gol până la Pasul 7.
+- `GET /assignments/{id}/stats` folosește, pentru fiecare student înscris, **cea mai bună trimitere terminată** (`DISTINCT ON (student_id)`, ordonat după scor și dată): din ea vin rata de trecere pe test, distribuția scorurilor (0–25, 26–50, 51–75, 76–99, 100) și scorul mediu. Numărătorile folosesc `COUNT(*) FILTER (WHERE ...)`.
+- Studenții care au părăsit cursul nu mai apar în statistici și în lista de trimiteri (join cu `enrollments`); trimiterile lor rămân în baza de date.
+- `GET /assignments/{id}/submissions` întoarce acum pentru ambele roluri aceeași formă: `{items, total, page, page_size, counts}`. Studentul își vede doar trimiterile lui; profesorul are filtrele `verdict` (all, correct, partial, wrong, running), căutarea `q` după nume și paginarea. În căutare, `%` și `_` sunt tratate ca text.
+- Lista de teme a profesorului are în plus `submitted_count`, `enrolled_count` și `result_buckets` (complet, parțial, zero), calculate dintr-o singură interogare pe curs.
+- Au intrat și `GET /courses/{id}/stats` și `GET /users/me/activity?weeks=14` (un singur `GROUP BY` pe zi, în UTC). `concepts_mastered` rămâne 0 până la Pasul 7.
+- Nu a fost nevoie de o migrare nouă: indexurile cerute aici există din migrarea `0002`.
+- Frontend: dashboard-ul studentului (macheta 02), profilul (09), pagina cursului pentru profesor (10), editorul de temă cu `TestCaseForm` (12) și pagina de trimiteri cu statistici (14). Distribuția scorurilor e desenată cu Recharts și are un dublu text pentru cititoare de ecran.
+- Pagina cursului are un rând de file cu o singură filă, Assignments; fila Materials vine în Pasul 8.
+- Editorul salvează într-un singur pas: întâi detaliile temei, apoi testele (cele noi se creează, cele existente se actualizează, cele scoase din formular se șterg).
+- Ecrane fără machetă, făcute din aceleași componente: „My courses” al profesorului (carduri și formular de curs nou) și fereastra cu codul unei trimiteri, deschisă din linkul „Code”.
+- Diferențe față de machete: câmpul de indiciu apare la orice test, nu doar la cele ascunse (backend-ul îl acceptă pe toate); fiecare test are buton de ștergere; pagina cursului nu are butoane de ștergere pentru curs sau temă, deși rutele există.

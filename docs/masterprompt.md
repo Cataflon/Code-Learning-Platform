@@ -240,7 +240,7 @@ Toate rutele stau sub `/api/v1`, în afară de `/health`. „Membru” înseamn�
 | `PATCH /test-cases/{id}` | profesorul cursului | modifică un test | 1 |
 | `DELETE /test-cases/{id}` | profesorul cursului | șterge un test | 1 |
 | `POST /assignments/{id}/submissions` | student înscris | trimite cod; răspuns 201 cu rezultate în Pasul 3, 202 cu status `queued` din Pasul 5 | 3, 5 |
-| `GET /assignments/{id}/submissions` | membru | student: ale lui; profesor: toate, cu filtre și paginare | 3, 6 |
+| `GET /assignments/{id}/submissions` | membru | student: ale lui; profesor: toate, cu filtre (`verdict`, `q`) și paginare (`page`, `page_size`); răspuns `{items, total, page, page_size, counts}` pentru ambele roluri | 3, 6 |
 | `GET /submissions/{id}` | autorul sau profesorul cursului | status și rezultate; testele ascunse apar fără conținut | 3, 5 |
 | `GET /me/dashboard` | student | cursuri, teme, cel mai bun scor, ultimele trimiteri | 6 |
 | `GET /assignments/{id}/stats` | profesorul cursului | rata de trecere pe test și distribuția scorurilor | 6 |
