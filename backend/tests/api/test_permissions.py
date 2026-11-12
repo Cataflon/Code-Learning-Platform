@@ -5,6 +5,7 @@ Actors:
   owner          the teacher of the course
   other_teacher  a teacher of a different course
   member         a student enrolled in the course
+  classmate      another student enrolled in the same course
   outsider       a student who is not enrolled
 
 Every new route adds lines here.
@@ -12,7 +13,7 @@ Every new route adds lines here.
 
 import pytest
 
-from app.models import Role
+from app.models import Role, Submission
 
 API = "/api/v1"
 
@@ -20,11 +21,13 @@ COURSE = "/courses/{course}"
 ASSIGNMENT = "/assignments/{assignment}"
 DRAFT = "/assignments/{draft}"
 TEST_CASE = "/test-cases/{test_case}"
+SUBMISSION = "/submissions/{submission}"
 
 NEW_COURSE = {"title": "New course"}
 NEW_ASSIGNMENT = {"title": "New assignment"}
 NEW_TEST = {"name": "New test"}
 NEW_CONCEPT = {"name": "New concept"}
+CODE = {"code": "print(1)"}
 
 MATRIX = [
     # --- profile
@@ -92,24 +95,44 @@ MATRIX = [
     ("member", "DELETE", TEST_CASE, None, 403),
     ("other_teacher", "DELETE", TEST_CASE, None, 404),
     ("owner", "DELETE", TEST_CASE, None, 204),
+    # --- submissions
+    ("anonymous", "POST", ASSIGNMENT + "/submissions", CODE, 401),
+    ("owner", "POST", ASSIGNMENT + "/submissions", CODE, 403),
+    ("outsider", "POST", ASSIGNMENT + "/submissions", CODE, 404),
+    ("member", "POST", DRAFT + "/submissions", CODE, 404),
+    ("member", "GET", ASSIGNMENT + "/submissions", None, 200),
+    ("owner", "GET", ASSIGNMENT + "/submissions", None, 200),
+    ("outsider", "GET", ASSIGNMENT + "/submissions", None, 404),
+    ("other_teacher", "GET", ASSIGNMENT + "/submissions", None, 404),
+    ("anonymous", "GET", SUBMISSION, None, 401),
+    ("member", "GET", SUBMISSION, None, 200),  # the author
+    ("owner", "GET", SUBMISSION, None, 200),
+    ("classmate", "GET", SUBMISSION, None, 404),
+    ("outsider", "GET", SUBMISSION, None, 404),
+    ("other_teacher", "GET", SUBMISSION, None, 404),
 ]
 
 
 @pytest.fixture
-def world(make_user, make_course, make_assignment, make_test_case):
+def world(db_session, make_user, make_course, make_assignment, make_test_case):
     """One course with every kind of actor around it."""
     owner, other_teacher = make_user(Role.teacher), make_user(Role.teacher)
     member, outsider = make_user(Role.student), make_user(Role.student)
-    course = make_course(owner, students=[member])
+    classmate = make_user(Role.student)
+    course = make_course(owner, students=[member, classmate])
     make_course(other_teacher)
     assignment = make_assignment(course)
     draft = make_assignment(course, title="Draft", is_published=False)
     test_case = make_test_case(assignment)
+    submission = Submission(assignment_id=assignment.id, student_id=member.id, code="print(1)")
+    db_session.add(submission)
+    db_session.commit()
     return {
         "actors": {
             "owner": owner,
             "other_teacher": other_teacher,
             "member": member,
+            "classmate": classmate,
             "outsider": outsider,
         },
         "ids": {
@@ -117,6 +140,7 @@ def world(make_user, make_course, make_assignment, make_test_case):
             "assignment": assignment.id,
             "draft": draft.id,
             "test_case": test_case.id,
+            "submission": submission.id,
         },
     }
 
