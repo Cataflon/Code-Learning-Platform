@@ -1,5 +1,6 @@
 """Application factory."""
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -19,7 +20,10 @@ from app.api.v1 import (
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.db.session import get_background_session_factory
+from app.runner.factory import get_runner
 from app.services.submission_runner import recover_interrupted_submissions
+
+logger = logging.getLogger(__name__)
 
 
 def build_api_router() -> APIRouter:
@@ -46,7 +50,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         recover_interrupted_submissions(db)
     finally:
         db.close()
+    remove_orphaned_sandboxes(app)
     yield
+
+
+def remove_orphaned_sandboxes(app: FastAPI) -> None:
+    """A killed server cannot run its cleanup code, so stale containers are removed here."""
+    runner = app.dependency_overrides.get(get_runner, get_runner)()
+    cleanup = getattr(runner, "remove_leftover_containers", None)
+    if cleanup is None:
+        return
+    try:
+        removed = cleanup()
+    except Exception as exc:  # Docker not running: the API still starts, submissions will fail
+        logger.warning("Could not check for leftover sandbox containers: %s", exc)
+        return
+    if removed:
+        logger.warning("Removed %d leftover sandbox container(s)", removed)
 
 
 def create_app() -> FastAPI:

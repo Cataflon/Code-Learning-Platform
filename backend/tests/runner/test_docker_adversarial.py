@@ -169,3 +169,14 @@ def test_no_containers_are_left_behind(docker_runner):
         docker_runner.run(code, "", Limits(time_limit_ms=500))
 
     assert docker_runner.leftover_containers() == []
+
+
+def test_leftover_containers_from_a_killed_server_are_removed(docker_runner):
+    orphan = docker_runner.client.containers.create(
+        docker_runner.image, command=["true"], labels={"autograder": "1"}
+    )
+
+    removed = docker_runner.remove_leftover_containers()
+
+    assert removed >= 1
+    assert orphan.id not in [container.id for container in docker_runner.leftover_containers()]

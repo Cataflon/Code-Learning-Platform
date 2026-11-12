@@ -174,3 +174,39 @@ def test_run_submission_holds_a_slot_while_it_evaluates(
 
     assert free_during_run == [False, False, False]  # the slot was taken for the whole run
     assert slots.acquire(blocking=False) is True  # and released afterwards
+
+
+def test_application_startup_removes_orphaned_sandbox_containers(client):
+    from fastapi.testclient import TestClient
+
+    from app.runner.factory import get_runner
+
+    class RunnerWithLeftovers:
+        cleaned = 0
+
+        def remove_leftover_containers(self) -> int:
+            self.cleaned += 1
+            return 2
+
+    runner = RunnerWithLeftovers()
+    client.app.dependency_overrides[get_runner] = lambda: runner
+
+    with TestClient(client.app):
+        pass
+
+    assert runner.cleaned == 1
+
+
+def test_application_still_starts_when_docker_is_unreachable(client):
+    from fastapi.testclient import TestClient
+
+    from app.runner.factory import get_runner
+
+    class BrokenRunner:
+        def remove_leftover_containers(self) -> int:
+            raise ConnectionError("docker daemon is not running")
+
+    client.app.dependency_overrides[get_runner] = lambda: BrokenRunner()
+
+    with TestClient(client.app) as restarted:
+        assert restarted.get("/health").status_code == 200

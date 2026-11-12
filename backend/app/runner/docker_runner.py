@@ -131,6 +131,17 @@ class DockerRunner:
         """Containers created by this runner that still exist (should always be empty)."""
         return self.client.containers.list(all=True, filters={"label": "autograder=1"})
 
+    def remove_leftover_containers(self) -> int:
+        """Remove sandbox containers orphaned by a server that was killed mid-run.
+
+        Called once at startup, before any new submission can start a container.
+        """
+        leftovers = self.leftover_containers()
+        for container in leftovers:
+            with contextlib.suppress(NotFound):
+                container.remove(force=True)
+        return len(leftovers)
+
 
 def is_memory_kill(state: dict, exit_code: int | None, timed_out: bool) -> bool:
     """Was the program stopped by the kernel for exceeding its memory limit?

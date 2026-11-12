@@ -19,7 +19,9 @@ from app.db.base import Base
 from app.db.session import get_background_session_factory, get_db
 from app.main import create_app
 from app.models import Assignment, Concept, Course, Enrollment, Role, TestCase, User
+from app.runner.factory import get_runner
 from app.services.course_service import generate_join_code
+from tests.fakes import FakeRunner
 
 TEST_DATABASE = "autograder_test"
 
@@ -97,6 +99,8 @@ def client(db_session: Session, background_session_factory) -> Iterator[TestClie
 
     app.dependency_overrides[get_db] = request_session
     app.dependency_overrides[get_background_session_factory] = lambda: background_session_factory
+    # Never the real sandbox by accident: a test that submits code sets its own runner.
+    app.dependency_overrides[get_runner] = lambda: FakeRunner([])
     with TestClient(app) as test_client:
         yield test_client
 
