@@ -82,6 +82,10 @@ function submission(overrides) {
   };
 }
 
+function pageOf(items) {
+  return { items, total: items.length, page: 1, page_size: 100, counts: {} };
+}
+
 function renderPage() {
   return renderApp(
     <Routes>
@@ -95,7 +99,7 @@ test("shows the problem, the limits and the latest result", async () => {
   mockApi({
     "GET /assignments/3": ASSIGNMENT,
     "GET /assignments/3/test-cases": TESTS,
-    "GET /assignments/3/submissions": [submission()],
+    "GET /assignments/3/submissions": pageOf([submission()]),
     "GET /submissions/41": submission(),
   });
 
@@ -127,7 +131,7 @@ test("submitting sends the code and shows the tests while they run", async () =>
   const { calls } = mockApi({
     "GET /assignments/3": ASSIGNMENT,
     "GET /assignments/3/test-cases": TESTS,
-    "GET /assignments/3/submissions": [],
+    "GET /assignments/3/submissions": pageOf([]),
     "POST /assignments/3/submissions": [202, queued],
     "GET /submissions/42": () => (polls++ === 0 ? { ...queued, status: "running" } : done),
   });
@@ -157,7 +161,7 @@ test("keeps the draft in localStorage", async () => {
   mockApi({
     "GET /assignments/3": ASSIGNMENT,
     "GET /assignments/3/test-cases": TESTS,
-    "GET /assignments/3/submissions": [],
+    "GET /assignments/3/submissions": pageOf([]),
   });
   const user = userEvent.setup();
   renderPage();
@@ -173,7 +177,7 @@ test("no attempts left disables submitting", async () => {
   mockApi({
     "GET /assignments/3": { ...ASSIGNMENT, submissions_left: 0 },
     "GET /assignments/3/test-cases": TESTS,
-    "GET /assignments/3/submissions": [],
+    "GET /assignments/3/submissions": pageOf([]),
   });
 
   renderPage();
@@ -186,7 +190,7 @@ test("a server refusal such as 429 is shown next to the button", async () => {
   mockApi({
     "GET /assignments/3": ASSIGNMENT,
     "GET /assignments/3/test-cases": TESTS,
-    "GET /assignments/3/submissions": [],
+    "GET /assignments/3/submissions": pageOf([]),
     "POST /assignments/3/submissions": [
       429,
       { detail: "Wait 4 more second(s) before submitting again", code: "too_many_requests" },
