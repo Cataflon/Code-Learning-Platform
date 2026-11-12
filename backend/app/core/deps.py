@@ -1,60 +1,101 @@
-"""Shared FastAPI dependencies.
+"""Shared FastAPI dependencies: the database session, the current user and access checks.
 
-Step 1 has no real authentication: ``get_current_user`` is a stand-in that returns a seeded
-user, and the ``*_for_member`` / ``*_for_owner`` loaders only fetch the resource. Step 2
-replaces their bodies with real token and access checks; the routers do not change.
+Access rules live here and in the services, never in router bodies:
+
+* no or bad token                         -> 401
+* wrong role for the route                -> 403
+* a resource of a course you are not in   -> 404 (so its existence is not revealed)
 """
 
+from collections.abc import Callable
 from typing import Annotated
 
-from fastapi import Depends, Header
-from sqlalchemy import select
+from fastapi import Depends
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
-from app.core.errors import UnauthorizedError
+from app.core.errors import NotFoundError, PermissionDeniedError, UnauthorizedError
+from app.core.security import decode_token
 from app.db.session import get_db
 from app.models import Assignment, Course, Role, TestCase, User
 from app.services import assignment_service, course_service, test_case_service
 
 DbSession = Annotated[Session, Depends(get_db)]
 
+# auto_error=False so a missing token goes through our uniform 401 response.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
-def get_current_user(
-    db: DbSession, x_debug_user_id: Annotated[int | None, Header()] = None
-) -> User:
-    """Stand-in: the user named by X-Debug-User-Id, or the first seeded teacher."""
-    if x_debug_user_id is not None:
-        user = db.get(User, x_debug_user_id)
-    else:
-        user = db.scalar(select(User).where(User.role == Role.teacher).order_by(User.id))
+_BEARER = {"WWW-Authenticate": "Bearer"}
+
+
+def get_current_user(db: DbSession, token: Annotated[str | None, Depends(oauth2_scheme)]) -> User:
+    if not token:
+        raise UnauthorizedError("Not authenticated", headers=_BEARER)
+    payload = decode_token(token)
+    try:
+        user_id = int(payload["sub"])
+    except (KeyError, ValueError) as exc:
+        raise UnauthorizedError("Invalid authentication token", headers=_BEARER) from exc
+    user = db.get(User, user_id)
     if user is None:
-        raise UnauthorizedError("No user available; run scripts/seed.py first")
+        raise UnauthorizedError("This account no longer exists", headers=_BEARER)
     return user
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
-TeacherUser = CurrentUser
-StudentUser = CurrentUser
 
 
-def get_course_for_member(course_id: int, db: DbSession) -> Course:
-    return course_service.get_course(db, course_id)
+def require_role(role: Role) -> Callable[[User], User]:
+    def checker(user: CurrentUser) -> User:
+        if user.role != role:
+            raise PermissionDeniedError(f"Only {role.value}s can do this")
+        return user
+
+    return checker
 
 
-def get_course_for_owner(course_id: int, db: DbSession) -> Course:
-    return course_service.get_course(db, course_id)
+TeacherUser = Annotated[User, Depends(require_role(Role.teacher))]
+StudentUser = Annotated[User, Depends(require_role(Role.student))]
 
 
-def get_assignment_for_member(assignment_id: int, db: DbSession) -> Assignment:
-    return assignment_service.get_assignment(db, assignment_id)
+def get_course_for_member(course_id: int, db: DbSession, user: CurrentUser) -> Course:
+    """The course, if the user teaches it or is enrolled in it."""
+    course = course_service.get_course(db, course_id)
+    if not course_service.is_member(db, user, course):
+        raise NotFoundError("Course not found")
+    return course
 
 
-def get_assignment_for_owner(assignment_id: int, db: DbSession) -> Assignment:
-    return assignment_service.get_assignment(db, assignment_id)
+def get_course_for_owner(course_id: int, db: DbSession, user: TeacherUser) -> Course:
+    """The course, if the user is its teacher."""
+    course = course_service.get_course(db, course_id)
+    if course.teacher_id != user.id:
+        raise NotFoundError("Course not found")
+    return course
 
 
-def get_test_case_for_owner(test_case_id: int, db: DbSession) -> TestCase:
-    return test_case_service.get_test_case(db, test_case_id)
+def get_assignment_for_member(assignment_id: int, db: DbSession, user: CurrentUser) -> Assignment:
+    assignment = assignment_service.get_assignment(db, assignment_id)
+    if not course_service.is_member(db, user, assignment.course):
+        raise NotFoundError("Assignment not found")
+    # Drafts do not exist as far as students are concerned.
+    if user.role == Role.student and not assignment.is_published:
+        raise NotFoundError("Assignment not found")
+    return assignment
+
+
+def get_assignment_for_owner(assignment_id: int, db: DbSession, user: TeacherUser) -> Assignment:
+    assignment = assignment_service.get_assignment(db, assignment_id)
+    if assignment.course.teacher_id != user.id:
+        raise NotFoundError("Assignment not found")
+    return assignment
+
+
+def get_test_case_for_owner(test_case_id: int, db: DbSession, user: TeacherUser) -> TestCase:
+    test_case = test_case_service.get_test_case(db, test_case_id)
+    if test_case.assignment.course.teacher_id != user.id:
+        raise NotFoundError("Test case not found")
+    return test_case
 
 
 MemberCourse = Annotated[Course, Depends(get_course_for_member)]

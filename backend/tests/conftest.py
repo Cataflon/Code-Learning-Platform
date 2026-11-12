@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401
 from app.core.config import get_settings
+from app.core.security import create_access_token, hash_password
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
@@ -77,12 +78,13 @@ def client(db_session: Session) -> Iterator[TestClient]:
 def make_user(db_session: Session) -> Callable[..., User]:
     counter = {"n": 0}
 
-    def _make_user(role: Role = Role.student, **overrides) -> User:
+    def _make_user(role: Role = Role.student, password: str | None = None, **overrides) -> User:
         counter["n"] += 1
         fields = {
             "email": f"{role.value}{counter['n']}@example.com",
             "full_name": f"{role.value.title()} {counter['n']}",
-            "password_hash": "!unusable",
+            # Argon2 is slow on purpose, so only hash when a test needs to sign in.
+            "password_hash": hash_password(password) if password else "!unusable",
             "role": role,
         }
         fields.update(overrides)
@@ -167,7 +169,7 @@ def auth() -> Callable[[User], dict[str, str]]:
     """Headers that make a request run as the given user."""
 
     def _auth(user: User) -> dict[str, str]:
-        return {"X-Debug-User-Id": str(user.id)}
+        return {"Authorization": f"Bearer {create_access_token(user)}"}
 
     return _auth
 
