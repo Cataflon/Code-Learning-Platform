@@ -1,0 +1,44 @@
+@startuml use-case
+left to right direction
+skinparam packageStyle rectangle
+
+actor Student
+actor Profesor as Teacher
+
+rectangle "Platforma de programare cu autograder" {
+  usecase "Creează cont / se autentifică" as UC1
+  usecase "Se înscrie la curs cu cod" as UC2
+  usecase "Vede tema și testele publice" as UC3
+  usecase "Trimite cod Python" as UC4
+  usecase "Vede verdictul pe fiecare test" as UC5
+  usecase "Vede raportul pe concepte" as UC6
+  usecase "Parcurge materialele (Learn)" as UC7
+  usecase "Primește recomandări de materiale" as UC8
+
+  usecase "Creează curs și cod de înscriere" as UC10
+  usecase "Creează teme, teste și concepte" as UC11
+  usecase "Încarcă materiale PDF / PPTX" as UC12
+  usecase "Leagă materiale de teme și teste" as UC13
+  usecase "Vede trimiterile și statisticile" as UC14
+
+  usecase "Rulează codul în sandbox Docker" as UC20
+}
+
+Student --> UC1
+Student --> UC2
+Student --> UC3
+Student --> UC4
+Student --> UC6
+Student --> UC7
+
+Teacher --> UC1
+Teacher --> UC10
+Teacher --> UC11
+Teacher --> UC12
+Teacher --> UC13
+Teacher --> UC14
+
+UC4 ..> UC20 : <<include>>
+UC4 ..> UC5 : <<include>>
+UC5 <.. UC8 : <<extend>>\n(test picat)
+@enduml
