@@ -60,3 +60,16 @@ Câte un rezumat scurt pe pas: ce s-a construit și de ce. Deciziile mari au și
 - `error_excerpt` rezumă primul traceback (de exemplu `IndexError, line 4`).
 - În acest pas `POST .../submissions` e sincron și răspunde 201 cu rezultatele; Pasul 5 îl face asincron (202).
 - Indexurile pe `submissions` și `test_results` din „Modelul de date” sunt deja în migrarea `0002`.
+
+## Pasul 4 · Sandbox Docker
+
+- `DockerRunner` implementează aceeași interfață `Runner`; în afară de `runner/factory.py`, niciun alt cod nu s-a schimbat.
+- Un container nou pe test, șters în `finally`, cu eticheta `autograder=1`; după fiecare test Docker se verifică automat că nu a rămas niciunul.
+- Limitele (D12): fără rețea, memorie și swap egale cu limita temei, 0,5 CPU, 64 de procese, rootfs doar pentru citire cu `/tmp` de 16 MB în memorie, `cap_drop=ALL`, `no-new-privileges`, uid 10001, loguri limitate la 1 MB, output trunchiat la 64 KB.
+- D9 (vezi `docs/adr/0001-livrare-cod.md`): codul ajunge în container printr-un director temporar montat doar pentru citire. `put_archive` nu merge cu rootfs `read_only`.
+- Memoria depășită se detectează din `State.OOMKilled`, nu din codul 137, care apare și după `kill()` la timeout. Comanda folosește `exec`, ca Python să fie procesul principal.
+- Timpul raportat e durata containerului (`StartedAt`–`FinishedAt`); așteptarea maximă e limita temei plus marja de pornire de 2 s.
+- `RUNNER=docker` e implicit; `RUNNER=subprocess` e refuzat la validarea configurării dacă `ENV` nu e `dev`.
+- Un semafor global (`MAX_CONCURRENT_RUNS`, implicit 2) limitează evaluările simultane, deci și containerele.
+- D10: backend-ul rămâne pe gazdă; Python 3.12 în sandbox, fără biblioteci externe.
+- Suita de contract rulează aceleași 14 programe pe ambele runner-e; suita adversarială are 16 teste. În CI se construiește imaginea și se rulează și testele cu markerul `docker`.
