@@ -100,6 +100,7 @@ MATRIX = [
     ("owner", "POST", ASSIGNMENT + "/submissions", CODE, 403),
     ("outsider", "POST", ASSIGNMENT + "/submissions", CODE, 404),
     ("member", "POST", DRAFT + "/submissions", CODE, 404),
+    ("member", "POST", ASSIGNMENT + "/submissions", CODE, 202),
     ("member", "GET", ASSIGNMENT + "/submissions", None, 200),
     ("owner", "GET", ASSIGNMENT + "/submissions", None, 200),
     ("outsider", "GET", ASSIGNMENT + "/submissions", None, 404),

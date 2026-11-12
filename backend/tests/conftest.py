@@ -16,7 +16,7 @@ import app.models  # noqa: F401
 from app.core.config import get_settings
 from app.core.security import create_access_token, hash_password
 from app.db.base import Base
-from app.db.session import get_db
+from app.db.session import get_background_session_factory, get_db
 from app.main import create_app
 from app.models import Assignment, Concept, Course, Enrollment, Role, TestCase, User
 from app.services.course_service import generate_join_code
@@ -66,10 +66,37 @@ def db_session(engine: Engine) -> Iterator[Session]:
     connection.close()
 
 
+@pytest.fixture(autouse=True)
+def no_submission_interval(monkeypatch):
+    """Tests submit in quick succession; the 429 rule is switched on only where it is tested."""
+    monkeypatch.setattr(get_settings(), "min_submission_interval_s", 0)
+
+
 @pytest.fixture
-def client(db_session: Session) -> Iterator[TestClient]:
+def background_session_factory(db_session: Session) -> Callable[[], Session]:
+    """New sessions on the same connection as the test, so background work sees its data."""
+
+    def factory() -> Session:
+        return Session(
+            bind=db_session.connection(),
+            join_transaction_mode="create_savepoint",
+            expire_on_commit=False,
+        )
+
+    return factory
+
+
+@pytest.fixture
+def client(db_session: Session, background_session_factory) -> Iterator[TestClient]:
     app = create_app()
-    app.dependency_overrides[get_db] = lambda: db_session
+
+    def request_session() -> Iterator[Session]:
+        # A background task may have changed rows through another session: reload them.
+        db_session.expire_all()
+        yield db_session
+
+    app.dependency_overrides[get_db] = request_session
+    app.dependency_overrides[get_background_session_factory] = lambda: background_session_factory
     with TestClient(app) as test_client:
         yield test_client
 

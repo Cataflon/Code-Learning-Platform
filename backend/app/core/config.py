@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     sandbox_pids_limit: int = 64
     sandbox_startup_margin_ms: int = 2000
     max_concurrent_runs: int = 2
+    # Minimum time between two submissions of one student to one assignment (else 429).
+    min_submission_interval_s: int = 5
 
     @model_validator(mode="after")
     def _subprocess_runner_only_in_dev(self) -> Self:

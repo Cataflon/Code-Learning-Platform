@@ -6,7 +6,13 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.errors import ConflictError, InvalidDataError, NotFoundError
+from app.core.config import get_settings
+from app.core.errors import (
+    ConflictError,
+    InvalidDataError,
+    NotFoundError,
+    TooManyRequestsError,
+)
 from app.models import Assignment, Role, Submission, SubmissionStatus, TestCase, TestResult, User
 from app.models.submission import Verdict
 from app.runner.base import Limits, Runner
@@ -30,6 +36,27 @@ def submissions_left(db: Session, student: User, assignment: Assignment) -> int:
     return max(0, assignment.max_submissions - count_submissions(db, student.id, assignment.id))
 
 
+def _check_min_interval(db: Session, student: User, assignment: Assignment) -> None:
+    """A simple brake on spam: one submission per student and assignment every few seconds."""
+    interval = get_settings().min_submission_interval_s
+    if interval <= 0:
+        return
+    last = db.scalar(
+        select(func.max(Submission.created_at)).where(
+            Submission.student_id == student.id, Submission.assignment_id == assignment.id
+        )
+    )
+    if last is None:
+        return
+    wait = interval - (datetime.now(UTC) - last).total_seconds()
+    if wait > 0:
+        seconds = max(1, round(wait))
+        raise TooManyRequestsError(
+            f"Wait {seconds} more second(s) before submitting again",
+            headers={"Retry-After": str(seconds)},
+        )
+
+
 def create_submission(db: Session, student: User, assignment: Assignment, code: str) -> Submission:
     if not assignment.test_cases:
         raise InvalidDataError("This assignment has no tests yet")
@@ -37,6 +64,7 @@ def create_submission(db: Session, student: User, assignment: Assignment, code: 
         raise ConflictError("The deadline for this assignment has passed")
     if submissions_left(db, student, assignment) <= 0:
         raise ConflictError("You have no attempts left for this assignment")
+    _check_min_interval(db, student, assignment)
     submission = Submission(
         assignment_id=assignment.id,
         student_id=student.id,
@@ -44,6 +72,7 @@ def create_submission(db: Session, student: User, assignment: Assignment, code: 
         language=assignment.language,
         status=SubmissionStatus.queued,
         total_count=len(assignment.test_cases),
+        created_at=datetime.now(UTC),
     )
     db.add(submission)
     db.commit()
