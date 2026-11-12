@@ -23,3 +23,14 @@ Câte un rezumat scurt pe pas: ce s-a construit și de ce. Deciziile mari au și
 - În dezvoltare, Vite trimite `/api` și `/health` prin proxy către backend, deci browserul vede o singură origine și nu apar probleme CORS.
 - D3 = JavaScript, D11 = Tailwind CSS 3 (documentul cere `tailwind.config.js`, formatul versiunii 3), D1 = engleză în cod și interfață.
 - Culorile și fonturile variantei D sunt definite o singură dată în `frontend/tailwind.config.js`; fonturile vin din pachetele `@fontsource`, ca demo-ul să meargă fără internet.
+
+## Pasul 1 · Modelul de date și CRUD
+
+- Șapte tabele create prin prima migrare Alembic (`0001`): users, courses, enrollments, assignments, concepts, test_cases și tabelul de legătură test_case_concepts.
+- Straturi stricte: routerele validează cu scheme Pydantic și apelează servicii; doar serviciile scriu interogări; modelele descriu tabelele.
+- Schemele `Read` sunt separate de modele, deci `password_hash` nu poate ajunge într-un răspuns. Studentul primește `TestCasePublicRead`, fără greutate și indiciu, și doar testele publice.
+- Erorile de domeniu (`NotFoundError`, `ConflictError`, `InvalidDataError` etc.) sunt transformate într-un singur loc în JSON `{"detail", "code"}`.
+- Autentificarea e un substitut: `get_current_user` citește antetul `X-Debug-User-Id` sau ia primul profesor din seed. Routerele folosesc deja dependențele `*_for_member` și `*_for_owner`, pe care Pasul 2 le umple cu verificări reale fără să atingă routerele.
+- Rolul e stocat ca text (enum ne-nativ), ca migrările să nu depindă de tipuri ENUM din PostgreSQL.
+- `join_code` are 8 caractere dintr-un alfabet fără 0/O și 1/I. Câmpurile cerute de machete (`color`, `max_submissions`, `hint`) sunt în model de la început.
+- Testele rulează pe baza `autograder_test`, fiecare într-o tranzacție anulată la final. Un test separat aplică migrările pe o bază goală, verifică cu `alembic check` că modelele și migrările coincid, apoi face downgrade.
