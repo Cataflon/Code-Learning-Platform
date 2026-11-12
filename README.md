@@ -7,10 +7,13 @@ Python rulat izolat în Docker și află, pe concepte, unde greșește.
 
 ```bash
 docker compose up -d db                      # PostgreSQL pe localhost:5433
+docker build -t autograder-python sandbox    # imaginea in care ruleaza codul studentilor
 cd backend
 python -m venv .venv
 .venv\Scripts\activate                       # Windows; pe Linux/macOS: source .venv/bin/activate
 pip install -e ".[dev]"
+alembic upgrade head                         # creeaza tabelele
+python -m scripts.seed                       # date de test (parola: parola123)
 uvicorn app.main:app --reload                # http://localhost:8000/docs
 ```
 
@@ -25,7 +28,7 @@ npm run dev                                  # http://localhost:5173
 ## Teste
 
 ```bash
-cd backend && ruff check . && pytest
+cd backend && ruff check . && pytest          # toate; rapid, fara Docker: pytest -m "not docker"
 cd frontend && npm test
 ```
 

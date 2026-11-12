@@ -35,6 +35,9 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest -m "not docker and not libreoffice"
+      # GitHub runners have Docker: build the sandbox image and run the isolation tests too.
+      - run: docker build -t autograder-python:latest ../sandbox
+      - run: pytest -m docker
 
   frontend:
     runs-on: ubuntu-latest

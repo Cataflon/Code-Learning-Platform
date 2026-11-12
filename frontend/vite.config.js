@@ -1,7 +1,8 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-const backend = "http://localhost:8000";
+// 127.0.0.1, not localhost: on Windows "localhost" tries IPv6 first and can add a 2 s delay.
+const backend = "http://127.0.0.1:8000";
 
 export default defineConfig({
   plugins: [react()],

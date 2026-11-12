@@ -1,8 +1,9 @@
 import pytest
 
+from app.core.config import get_settings
 from app.models import Role
 from app.runner.factory import get_runner
-from tests.fakes import echo_runner
+from tests.fakes import FakeRunner, echo_runner
 
 API = "/api/v1"
 
@@ -24,7 +25,7 @@ def setup(client, make_user, make_course, make_assignment, make_test_case):
     return teacher, student, assignment
 
 
-def test_enrolled_student_submits_and_gets_results(client, auth, setup):
+def test_post_answers_202_queued_and_get_returns_the_finished_result(client, auth, setup):
     _, student, assignment = setup
 
     response = client.post(
@@ -33,8 +34,14 @@ def test_enrolled_student_submits_and_gets_results(client, auth, setup):
         headers=auth(student),
     )
 
-    assert response.status_code == 201
-    body = response.json()
+    # The response is sent before any test runs: queued, no score, every verdict pending.
+    assert response.status_code == 202
+    queued = response.json()
+    assert queued["status"] == "queued"
+    assert queued["score"] is None
+    assert queued["verdicts"] == [None, None]
+    # TestClient runs the background task before returning, so polling now sees the end state.
+    body = client.get(f"{API}/submissions/{queued['id']}", headers=auth(student)).json()
     assert body["status"] == "done"
     assert (body["score"], body["passed_count"], body["total_count"]) == (50, 1, 2)
     assert body["verdicts"] == ["passed", "wrong_answer"]
@@ -145,3 +152,33 @@ def test_list_returns_own_attempts_newest_first(client, auth, setup):
     assert [item["attempt_number"] for item in listed] == [2, 1]
     assert "code" not in listed[0]
     assert listed[0]["verdicts"] == ["passed", "wrong_answer"]
+
+
+def test_second_submission_inside_the_minimum_interval_gets_429(client, auth, setup, monkeypatch):
+    _, student, assignment = setup
+    monkeypatch.setattr(get_settings(), "min_submission_interval_s", 5)
+    url = f"{API}/assignments/{assignment.id}/submissions"
+
+    first = client.post(url, json={"code": "print(1)"}, headers=auth(student))
+    second = client.post(url, json={"code": "print(1)"}, headers=auth(student))
+
+    assert first.status_code == 202
+    assert second.status_code == 429
+    assert second.json()["code"] == "too_many_requests"
+    assert int(second.headers["Retry-After"]) >= 1
+
+
+def test_runner_crash_is_reported_as_error_status(client, auth, setup):
+    _, student, assignment = setup
+    client.app.dependency_overrides[get_runner] = lambda: FakeRunner([RuntimeError("docker down")])
+
+    created = client.post(
+        f"{API}/assignments/{assignment.id}/submissions",
+        json={"code": "print(1)"},
+        headers=auth(student),
+    ).json()
+    body = client.get(f"{API}/submissions/{created['id']}", headers=auth(student)).json()
+
+    assert body["status"] == "error"
+    assert "could not be evaluated" in body["error_message"]
+    assert body["score"] is None
