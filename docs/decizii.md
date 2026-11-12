@@ -47,3 +47,16 @@ Câte un rezumat scurt pe pas: ce s-a construit și de ce. Deciziile mari au și
 - Frontend: `apiFetch` adaugă token-ul și face logout la 401; `AuthContext` reîncarcă profilul după refresh; `ProtectedRoute` trimite vizitatorul la login și rolul greșit la pagina lui.
 - Componentele comune (`ui.jsx`, `VerdictSquares`, `states.jsx`) reproduc stilul machetelor; iconițele vin din `lucide-react` (dependență în plus față de tabelul de tehnologii).
 - Formularul de înregistrare nu are machetă: folosește același cadru ca pagina Sign in.
+
+## Pasul 3 · Trimiteri și evaluare, prototip
+
+- `Runner` e un `typing.Protocol`: serviciul de evaluare depinde de formă (`run(code, stdin, limits) -> RunResult`), nu de o implementare. Runner-ul se obține dintr-o singură dependență, `get_runner()`.
+- `SubprocessRunner` e doar prototip local: nu e sandbox, nu aplică limita de memorie și nu se folosește cu cod necunoscut.
+- D4: teste pe stdin și stdout. D13: comparația ignoră spațiile de la capătul liniilor și liniile goale de la final. D14: scorul e procentul din greutatea testelor trecute.
+- Verdictul se decide într-o funcție pură, în ordinea: timp depășit, memorie depășită, cod de ieșire diferit de 0, apoi compararea outputului.
+- Evaluarea salvează câte un `TestResult` imediat după fiecare test; o excepție din runner duce trimiterea în `error`, niciodată blocată în `running`.
+- Pentru student, un test ascuns apare ca „Hidden test #n”, fără input, output așteptat, output obținut sau stderr. Indiciul apare doar dacă testul a picat.
+- O trimitere e refuzată cu 409 dacă termenul a trecut sau nu mai sunt încercări (`max_submissions`), și cu 422 dacă tema nu are teste sau codul trece de 64 KB.
+- `error_excerpt` rezumă primul traceback (de exemplu `IndexError, line 4`).
+- În acest pas `POST .../submissions` e sincron și răspunde 201 cu rezultatele; Pasul 5 îl face asincron (202).
+- Indexurile pe `submissions` și `test_results` din „Modelul de date” sunt deja în migrarea `0002`.
