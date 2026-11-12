@@ -10,7 +10,7 @@ from app.core.deps import (
     ViewableSubmission,
 )
 from app.runner.base import Runner
-from app.runner.factory import get_runner
+from app.runner.factory import get_run_slots, get_runner
 from app.schemas.submission import SubmissionCreate, SubmissionRead, SubmissionSummary
 from app.services import submission_service
 
@@ -31,7 +31,8 @@ def create_submission(
 ):
     """Synchronous in this step: the response arrives after every test has run."""
     submission = submission_service.create_submission(db, user, assignment, data.code)
-    submission_service.evaluate_submission(db, submission, runner)
+    with get_run_slots():  # limits how many sandbox containers run at the same time
+        submission_service.evaluate_submission(db, submission, runner)
     return submission_service.to_read(db, submission, user)
 
 
