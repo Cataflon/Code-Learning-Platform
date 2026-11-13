@@ -47,7 +47,7 @@ export default function RegisterPage() {
 
   return (
     <AuthShell>
-      <h2 className="text-4xl font-bold">Create account</h2>
+      <h1 className="text-[22px]">Create account</h1>
       <p className="mt-3 text-ink-3">Join your courses and start submitting.</p>
       <form className="mt-8 space-y-5" onSubmit={handleSubmit} noValidate>
         <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Account type">
@@ -59,7 +59,7 @@ export default function RegisterPage() {
               aria-checked={form.role === role.value}
               onClick={() => setForm((old) => ({ ...old, role: role.value }))}
               className={
-                "border px-4 py-2.5 text-sm font-semibold " +
+                "chip h-10 justify-center border px-4 py-2.5 text-sm font-semibold " +
                 (form.role === role.value
                   ? "border-accent-strong bg-accent/20 text-accent-strong"
                   : "border-edge text-ink-3 hover:text-ink")

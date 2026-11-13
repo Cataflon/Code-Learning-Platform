@@ -33,7 +33,7 @@ export default function LoginPage() {
 
   return (
     <AuthShell>
-      <h2 className="text-4xl font-bold">Welcome back</h2>
+      <h1 className="text-[22px]">Welcome back</h1>
       <p className="mt-3 text-ink-3">Sign in to continue your assignments.</p>
       {location.state?.registered && (
         <p className="mt-4 border border-ok/40 bg-ok/15 px-4 py-3 text-sm text-ok">

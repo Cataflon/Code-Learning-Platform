@@ -17,7 +17,7 @@ export default function Modal({ title, subtitle, icon, onClose, children, footer
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 px-4 py-24"
+      className="overlay"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -28,29 +28,28 @@ export default function Modal({ title, subtitle, icon, onClose, children, footer
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`w-full border border-edge bg-card shadow-2xl outline-none ${
-          wide ? "max-w-4xl" : "max-w-2xl"
-        }`}
+        className={`card w-full outline-none ${wide ? "max-w-4xl" : "max-w-2xl"}`}
+        style={{ background: "var(--card)" }}
       >
-        <header className="flex items-start gap-4 px-7 py-6">
+        <header className="card-head items-start">
           {icon}
           <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="text-xl font-semibold">
+            <h2 id={titleId}>
               {title}
             </h2>
-            {subtitle && <p className="mt-1 text-ink-3">{subtitle}</p>}
+            {subtitle && <p className="mt-2 text-ink-3">{subtitle}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close dialog"
-            className="border border-edge p-2 text-ink-3 hover:text-ink"
+            className="btn icon"
           >
             <X className="h-4 w-4" />
           </button>
         </header>
         {children}
-        {footer && <footer className="flex justify-end gap-3 border-t border-edge px-7 py-5">{footer}</footer>}
+        {footer && <footer className="dash-top flex justify-end gap-3 px-6 py-4">{footer}</footer>}
       </div>
     </div>
   );

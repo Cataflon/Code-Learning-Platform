@@ -1,14 +1,12 @@
-import { Check, X } from "lucide-react";
+// The row of pixel squares, one per test: green passed, red failed, empty not run,
+// blinking violet running. Colour is never the only signal: every square has a title and
+// the row has a text label.
 
-const COLORS = {
-  passed: "bg-ok",
-  running: "bg-blue/60",
-  pending: "bg-idle",
-};
-
-export function verdictColor(verdict) {
-  if (verdict == null) return COLORS.pending;
-  return COLORS[verdict] ?? "bg-bad"; // every failing verdict is red
+export function verdictClass(verdict) {
+  if (verdict == null) return "";
+  if (verdict === "passed") return "ok";
+  if (verdict === "running") return "run";
+  return "bad"; // every failing verdict is red
 }
 
 export function verdictLabel(verdict) {
@@ -26,33 +24,22 @@ export function verdictLabel(verdict) {
 }
 
 /**
- * The row of colored squares, one per test, in test order.
- * `total` pads the row with empty squares for tests that have no verdict yet.
- * `large` draws the bigger squares with a check or a cross inside.
+ * `total` pads the row with empty squares for tests without a verdict yet.
+ * `large` draws the big 32 px squares used on the dashboard's main card.
  */
 export default function VerdictSquares({ verdicts = [], total, large = false }) {
   const count = Math.max(total ?? 0, verdicts.length);
   const cells = Array.from({ length: count }, (_, index) => verdicts[index] ?? null);
   const passed = cells.filter((verdict) => verdict === "passed").length;
-  const size = large ? "h-9 w-9" : "h-4 w-4";
 
   return (
-    <span
-      className={`inline-flex flex-wrap ${large ? "gap-2" : "gap-1.5"}`}
-      role="img"
-      aria-label={`${passed} of ${count} tests passed`}
-    >
+    <span className={`sqs ${large ? "lg" : ""}`} role="img" aria-label={`${passed} of ${count} tests passed`}>
       {cells.map((verdict, index) => (
-        <span
+        <i
           key={index}
           title={`Test ${index + 1}: ${verdictLabel(verdict)}`}
-          className={`flex items-center justify-center ${size} ${verdictColor(verdict)}`}
-        >
-          {large && verdict === "passed" && <Check className="h-4 w-4 text-ok/15" strokeWidth={3} />}
-          {large && verdict && verdict !== "passed" && verdict !== "running" && (
-            <X className="h-4 w-4 text-bad/15" strokeWidth={3} />
-          )}
-        </span>
+          className={`sq ${verdictClass(verdict)}`}
+        />
       ))}
     </span>
   );

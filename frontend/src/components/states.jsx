@@ -15,12 +15,9 @@ export function LoadingState({ label = "Loading…" }) {
 
 export function ErrorState({ error, onRetry }) {
   return (
-    <div
-      className="flex flex-col items-center gap-3 border border-bad/40 bg-bad/15 px-6 py-10 text-center"
-      role="alert"
-    >
+    <div className="card t-bad flex flex-col items-center gap-3 px-6 py-10 text-center" role="alert">
       <AlertTriangle className="h-6 w-6 text-bad" aria-hidden="true" />
-      <p className="text-bad">{error?.message ?? "Something went wrong."}</p>
+      <p className="font-plain text-bad">{error?.message ?? "Something went wrong."}</p>
       {onRetry && (
         <button type="button" className={buttonClass("neutral", "sm")} onClick={onRetry}>
           Try again
@@ -34,8 +31,8 @@ export function EmptyState({ title, children, action }) {
   return (
     <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
       <Inbox className="h-6 w-6 text-ink-3" aria-hidden="true" />
-      <p className="font-semibold">{title}</p>
-      {children && <p className="max-w-md text-sm text-ink-3">{children}</p>}
+      <h2>{title}</h2>
+      {children && <p className="max-w-md font-plain text-sm text-ink-3">{children}</p>}
       {action && <div className="mt-3">{action}</div>}
     </div>
   );
