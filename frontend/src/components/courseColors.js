@@ -4,11 +4,11 @@ export const COURSE_COLORS = ["indigo", "blue", "purple", "green", "amber", "ros
 
 const BAR = {
   indigo: "bg-accent",
-  blue: "bg-info",
-  purple: "bg-hidden",
-  green: "bg-pass",
+  blue: "bg-blue",
+  purple: "bg-pink",
+  green: "bg-ok",
   amber: "bg-warn",
-  rose: "bg-fail",
+  rose: "bg-bad",
 };
 
 export function courseBarClass(color) {

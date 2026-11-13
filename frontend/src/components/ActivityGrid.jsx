@@ -45,7 +45,7 @@ export default function ActivityGrid({ days, weeks }) {
   return (
     <div>
       <div className="flex gap-3" role="img" aria-label={`Submissions per day in the last ${weeks} weeks`}>
-        <div className="grid grid-rows-7 gap-1.5 text-xs text-muted">
+        <div className="grid grid-rows-7 gap-1.5 text-xs text-ink-3">
           {ROW_LABELS.map((label, index) => (
             <span key={index} className="h-5 leading-5">
               {label}
@@ -59,7 +59,7 @@ export default function ActivityGrid({ days, weeks }) {
                 <span
                   key={row}
                   title={`${cell.date}: ${cell.count} ${cell.count === 1 ? "submission" : "submissions"}`}
-                  className={`h-5 w-5 rounded ${LEVEL_CLASSES[levelOf(cell.count, max)]}`}
+                  className={`h-5 w-5 ${LEVEL_CLASSES[levelOf(cell.count, max)]}`}
                 />
               ) : (
                 <span key={row} className="h-5 w-5" />
@@ -68,10 +68,10 @@ export default function ActivityGrid({ days, weeks }) {
           </div>
         ))}
       </div>
-      <p className="mt-4 flex items-center gap-1.5 text-sm text-muted">
+      <p className="mt-4 flex items-center gap-1.5 text-sm text-ink-3">
         less
         {LEVEL_CLASSES.map((cls) => (
-          <span key={cls} className={`h-3.5 w-3.5 rounded ${cls}`} />
+          <span key={cls} className={`h-3.5 w-3.5 ${cls}`} />
         ))}
         more
       </p>

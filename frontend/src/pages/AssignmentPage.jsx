@@ -24,8 +24,8 @@ function draftKey(assignmentId) {
 }
 
 function scoreColor(score) {
-  if (score === 100) return "text-pass";
-  if (score === 0) return "text-fail";
+  if (score === 100) return "text-ok";
+  if (score === 0) return "text-bad";
   return "text-warn";
 }
 
@@ -35,27 +35,27 @@ function ProblemCard({ assignment, examples }) {
       <CardHeader icon={MessageSquare} title="Problem" border={false} />
       <div className="space-y-5 px-7 pb-7">
         {/* react-markdown never renders raw HTML, so a description cannot inject scripts. */}
-        <div className="space-y-3 leading-relaxed text-ink/90 [&_code]:rounded [&_code]:bg-raised [&_code]:px-1.5 [&_code]:font-mono [&_code]:text-sm [&_li]:ml-5 [&_li]:list-disc">
+        <div className="space-y-3 leading-relaxed text-ink/90 [&_code]:rounded [&_code]:bg-black/35 [&_code]:px-1.5 [&_code]:font-mono [&_code]:text-sm [&_li]:ml-5 [&_li]:list-disc">
           <ReactMarkdown>{assignment.description || "No description yet."}</ReactMarkdown>
         </div>
         {examples.slice(0, 2).map((example) => (
           <div key={example.id} className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg border border-line bg-raised px-4 py-3">
-              <div className="text-sm text-muted">Input</div>
+            <div className="border border-edge bg-black/35 px-4 py-3">
+              <div className="text-sm text-ink-3">Input</div>
               <pre className="mt-1 whitespace-pre-wrap font-mono">{example.input_data.trim() || "(empty)"}</pre>
             </div>
-            <div className="rounded-lg border border-line bg-raised px-4 py-3">
-              <div className="text-sm text-muted">Output</div>
+            <div className="border border-edge bg-black/35 px-4 py-3">
+              <div className="text-sm text-ink-3">Output</div>
               <pre className="mt-1 whitespace-pre-wrap font-mono">{example.expected_output.trim() || "(empty)"}</pre>
             </div>
           </div>
         ))}
         <div className="flex justify-between">
-          <span className="text-muted">Libraries</span>
+          <span className="text-ink-3">Libraries</span>
           <span>standard only</span>
         </div>
         {assignment.hidden_test_count > 0 && (
-          <p className="flex gap-3 rounded-lg border border-accent/50 bg-accent-tint px-4 py-3 text-sm text-accent-soft">
+          <p className="flex gap-3 border border-accent/50 bg-accent/20 px-4 py-3 text-sm text-accent-strong">
             <Eye className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             Some tests are hidden. You see whether they passed and which concept they check, not
             their data.
@@ -71,22 +71,22 @@ function AttemptsCard({ attempts, activeId, onSelect }) {
     <Card>
       <CardHeader icon={List} title="Your attempts" />
       {attempts.length === 0 ? (
-        <p className="px-7 py-6 text-sm text-muted">No attempts yet. Your results will appear here.</p>
+        <p className="px-7 py-6 text-sm text-ink-3">No attempts yet. Your results will appear here.</p>
       ) : (
         <ul>
           {attempts.map((attempt) => (
-            <li key={attempt.id} className="border-b border-line last:border-b-0">
+            <li key={attempt.id} className="border-b border-edge last:border-b-0">
               <button
                 type="button"
                 onClick={() => onSelect(attempt.id)}
                 aria-current={attempt.id === activeId ? "true" : undefined}
-                className={`flex w-full items-center gap-4 px-7 py-4 text-left hover:bg-raised ${
-                  attempt.id === activeId ? "bg-accent-tint/60" : ""
+                className={`flex w-full items-center gap-4 px-7 py-4 text-left hover:bg-black/35 ${
+                  attempt.id === activeId ? "bg-accent/15" : ""
                 }`}
               >
                 <span className="flex-1">
                   <span className="block font-semibold">Attempt {attempt.attempt_number}</span>
-                  <span className="block text-sm text-muted">{formatDay(attempt.created_at)}</span>
+                  <span className="block text-sm text-ink-3">{formatDay(attempt.created_at)}</span>
                 </span>
                 <VerdictSquares verdicts={attempt.verdicts} total={attempt.total_count} />
                 <span className="w-12 text-right font-semibold">
@@ -111,15 +111,15 @@ function ResultCard({ submission }) {
         <IconBadge icon={Target} />
         <div className="flex-1">
           <h2 className="text-lg font-semibold">Result of attempt {submission.attempt_number}</h2>
-          <p className="text-sm text-muted">{timeAgo(submission.created_at)}</p>
+          <p className="text-sm text-ink-3">{timeAgo(submission.created_at)}</p>
         </div>
         {running && <StatusBadge status={submission.status} />}
         <VerdictSquares verdicts={submission.verdicts} total={submission.total_count} large />
         <div className="w-28 text-right">
-          <div className={`text-4xl font-bold ${submission.score != null ? scoreColor(submission.score) : "text-muted"}`}>
+          <div className={`text-4xl font-bold ${submission.score != null ? scoreColor(submission.score) : "text-ink-3"}`}>
             {submission.score != null ? `${submission.score}%` : "–"}
           </div>
-          <div className="text-sm text-muted">
+          <div className="text-sm text-ink-3">
             {submission.passed_count} of {submission.total_count} passed
           </div>
         </div>
@@ -242,15 +242,15 @@ export default function AssignmentPage() {
         </div>
         <div className="min-w-0 space-y-9">
           <Card className="overflow-hidden">
-            <header className="flex items-center justify-between border-b border-line px-6 py-4">
+            <header className="flex items-center justify-between border-b border-edge px-6 py-4">
               <span className="font-mono text-sm">solution.py</span>
-              <span className="text-sm text-muted">draft kept in this browser</span>
+              <span className="text-sm text-ink-3">draft kept in this browser</span>
             </header>
             <Suspense fallback={<LoadingState label="Loading the editor…" />}>
               <CodeEditor value={code} onChange={setCode} />
             </Suspense>
-            <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-line px-6 py-4">
-              <span className="text-sm text-muted">{capitalize(footer)}</span>
+            <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-edge px-6 py-4">
+              <span className="text-sm text-ink-3">{capitalize(footer)}</span>
               <Button size="lg" disabled={!canSubmit} onClick={() => submit.mutate()}>
                 <Play className="h-4 w-4 fill-current" aria-hidden="true" />
                 {submit.isPending ? "Submitting…" : "Submit"}

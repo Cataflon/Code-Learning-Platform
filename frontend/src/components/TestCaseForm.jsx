@@ -34,7 +34,7 @@ export function toRow(test) {
   };
 }
 
-const SEGMENT_TONES = ["bg-accent-tint border-accent/50 text-accent-soft", "bg-info-tint border-info-line text-info"];
+const SEGMENT_TONES = ["bg-accent/20 border-accent/50 text-accent-strong", "bg-blue/15 border-blue/40 text-blue"];
 
 function WeightBar({ tests }) {
   const total = tests.reduce((sum, test) => sum + (Number(test.weight) || 0), 0);
@@ -45,9 +45,9 @@ function WeightBar({ tests }) {
         <span
           key={test.key}
           style={{ flexGrow: Number(test.weight) || 0 }}
-          className={`min-w-0 basis-0 truncate rounded-md border px-3 py-1.5 text-xs font-semibold ${
+          className={`min-w-0 basis-0 truncate border px-3 py-1.5 text-xs font-semibold ${
             test.is_hidden
-              ? "border-dashed border-hidden bg-hidden-tint text-hidden"
+              ? "border-dashed border-pink bg-pink/15 text-pink"
               : SEGMENT_TONES[index % SEGMENT_TONES.length]
           }`}
         >
@@ -66,10 +66,10 @@ function Toggle({ checked, onChange, label }) {
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className={`relative h-7 w-12 rounded-full transition-colors ${checked ? "bg-accent" : "bg-idle"}`}
+      className={`relative h-7 w-12 transition-colors ${checked ? "bg-accent" : "bg-idle"}`}
     >
       <span
-        className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${checked ? "left-6" : "left-1"}`}
+        className={`absolute top-1 h-5 w-5 bg-white transition-all ${checked ? "left-6" : "left-1"}`}
       />
     </button>
   );
@@ -99,7 +99,7 @@ function ConceptPicker({ selectedIds, concepts, onChange, onCreateConcept }) {
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-sm font-semibold text-accent-soft/90">Concepts</span>
+        <span className="mr-1 text-sm font-semibold text-ink-2">Concepts</span>
         {selected.map((concept) => (
           <Chip key={concept.id}>
             {concept.name}
@@ -114,7 +114,7 @@ function ConceptPicker({ selectedIds, concepts, onChange, onCreateConcept }) {
           </Chip>
         ))}
         {!adding && (
-          <button type="button" className="px-2 text-sm text-muted hover:text-ink" onClick={() => setAdding(true)}>
+          <button type="button" className="px-2 text-sm text-ink-3 hover:text-ink" onClick={() => setAdding(true)}>
             Add concept
           </button>
         )}
@@ -126,7 +126,7 @@ function ConceptPicker({ selectedIds, concepts, onChange, onCreateConcept }) {
               key={concept.id}
               type="button"
               onClick={() => onChange([...selectedIds, concept.id])}
-              className="rounded-md border border-line px-2.5 py-1 text-xs font-semibold text-muted hover:border-accent-soft hover:text-accent-soft"
+              className="border border-edge px-2.5 py-1 text-xs font-semibold text-ink-3 hover:border-accent-strong hover:text-accent-strong"
             >
               + {concept.name}
             </button>
@@ -145,15 +145,15 @@ function ConceptPicker({ selectedIds, concepts, onChange, onCreateConcept }) {
               }
             }}
           />
-          <button type="button" className="text-sm font-semibold text-accent-soft" onClick={createAndAdd}>
+          <button type="button" className="text-sm font-semibold text-accent-strong" onClick={createAndAdd}>
             Create
           </button>
-          <button type="button" className="text-sm text-muted" onClick={() => setAdding(false)}>
+          <button type="button" className="text-sm text-ink-3" onClick={() => setAdding(false)}>
             Done
           </button>
         </div>
       )}
-      {error && <p className="mt-2 text-sm text-fail">{error}</p>}
+      {error && <p className="mt-2 text-sm text-bad">{error}</p>}
     </div>
   );
 }
@@ -166,28 +166,28 @@ function TestRow({ test, index, concepts, onChange, onRemove, onCreateConcept })
   const label = `test ${index + 1}`;
 
   return (
-    <Card className={`overflow-hidden ${test.is_hidden ? "border-hidden" : ""}`} aria-label={`Test ${index + 1}`}>
+    <Card className={`overflow-hidden ${test.is_hidden ? "border-pink" : ""}`} aria-label={`Test ${index + 1}`}>
       <header
-        className={`flex flex-wrap items-center gap-4 border-b border-line px-6 py-4 ${
-          test.is_hidden ? "bg-hidden-tint" : "bg-raised"
+        className={`flex flex-wrap items-center gap-4 border-b border-edge px-6 py-4 ${
+          test.is_hidden ? "bg-pink/15" : "bg-black/35"
         }`}
       >
         <span
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
-            test.is_hidden ? "bg-hidden text-bg" : "bg-accent-tint text-accent-soft"
+          className={`flex h-9 w-9 shrink-0 items-center justify-center text-sm font-semibold ${
+            test.is_hidden ? "bg-pink text-bg" : "bg-accent/20 text-accent-strong"
           }`}
         >
           {index + 1}
         </span>
         <input
-          className="min-w-0 flex-1 bg-transparent font-semibold placeholder:text-faint focus:outline-none"
+          className="min-w-0 flex-1 bg-transparent font-semibold placeholder:text-ink-3 focus:outline-none"
           aria-label={`Name of ${label}`}
           placeholder="Test name"
           value={test.name}
           maxLength={120}
           onChange={fromEvent("name")}
         />
-        <label className="flex items-center gap-3 text-sm text-muted">
+        <label className="flex items-center gap-3 text-sm text-ink-3">
           Weight
           <input
             type="number"
@@ -199,7 +199,7 @@ function TestRow({ test, index, concepts, onChange, onRemove, onCreateConcept })
             onChange={(event) => set("weight")(event.target.value === "" ? "" : Number(event.target.value))}
           />
         </label>
-        <span className="flex items-center gap-3 text-sm text-muted">
+        <span className="flex items-center gap-3 text-sm text-ink-3">
           Hidden
           <Toggle checked={test.is_hidden} onChange={set("is_hidden")} label={`Hide ${label}`} />
         </span>
@@ -207,24 +207,24 @@ function TestRow({ test, index, concepts, onChange, onRemove, onCreateConcept })
           type="button"
           onClick={onRemove}
           aria-label={`Remove ${label}`}
-          className="rounded-lg border border-fail/60 p-2 text-fail hover:bg-fail-tint"
+          className="border border-bad/60 p-2 text-bad hover:bg-bad/15"
         >
           <Trash2 className="h-4 w-4" />
         </button>
       </header>
       <div className="space-y-5 p-6">
         {test.is_hidden && (
-          <p className="flex items-center gap-3 text-sm text-hidden">
+          <p className="flex items-center gap-3 text-sm text-pink">
             <Eye className="h-4 w-4" aria-hidden="true" />
             Students never see this test's input or expected output.
           </p>
         )}
         <div className="grid gap-5 md:grid-cols-2">
-          <label className="block text-sm font-semibold text-accent-soft/90">
+          <label className="block text-sm font-semibold text-ink-2">
             Input
             <textarea className={`${areaClass} mt-2`} value={test.input_data} onChange={fromEvent("input_data")} />
           </label>
-          <label className="block text-sm font-semibold text-accent-soft/90">
+          <label className="block text-sm font-semibold text-ink-2">
             Expected output
             <textarea
               className={`${areaClass} mt-2`}
@@ -233,10 +233,10 @@ function TestRow({ test, index, concepts, onChange, onRemove, onCreateConcept })
             />
           </label>
         </div>
-        <label className="block text-sm font-semibold text-accent-soft/90">
+        <label className="block text-sm font-semibold text-ink-2">
           Hint for students, optional
           <input className={`${inputClass} mt-2 font-normal`} value={test.hint} maxLength={500} onChange={fromEvent("hint")} />
-          <span className="mt-1.5 block font-normal text-muted">Shown only when this test fails.</span>
+          <span className="mt-1.5 block font-normal text-ink-3">Shown only when this test fails.</span>
         </label>
         <ConceptPicker
           selectedIds={test.concept_ids}
@@ -262,13 +262,13 @@ export default function TestCaseForm({ tests, onChange, concepts, onCreateConcep
         <header className="flex items-center gap-4 px-7 py-5">
           <IconBadge icon={FlaskConical} />
           <h2 className="flex-1 text-lg font-semibold">Tests</h2>
-          <span className="text-muted">
+          <span className="text-ink-3">
             total weight <strong className="text-ink">{totalWeight}</strong>
           </span>
         </header>
         <WeightBar tests={tests} />
         {tests.length === 0 && (
-          <p className="px-7 pb-6 text-sm text-muted">No tests yet. Students cannot submit until there is one.</p>
+          <p className="px-7 pb-6 text-sm text-ink-3">No tests yet. Students cannot submit until there is one.</p>
         )}
       </Card>
       {tests.map((test, index) => (
@@ -285,7 +285,7 @@ export default function TestCaseForm({ tests, onChange, concepts, onCreateConcep
       <button
         type="button"
         onClick={() => onChange([...tests, emptyTest()])}
-        className="flex w-full items-center justify-center gap-3 rounded-card border border-dashed border-line py-6 font-semibold text-accent-soft hover:border-accent-soft"
+        className="flex w-full items-center justify-center gap-3 border border-dashed border-edge py-6 font-semibold text-accent-strong hover:border-accent-strong"
       >
         <Plus className="h-4 w-4" aria-hidden="true" />
         Add a test

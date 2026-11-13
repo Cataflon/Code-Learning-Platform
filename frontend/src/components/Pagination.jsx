@@ -9,7 +9,7 @@ export default function Pagination({ page, pageSize, total, onPageChange }) {
 
   return (
     <nav className="flex items-center justify-between px-7 py-4" aria-label="Pagination">
-      <span className="text-sm text-muted">
+      <span className="text-sm text-ink-3">
         {first}–{last} of {total}
       </span>
       <span className="flex gap-3">

@@ -44,12 +44,12 @@ function BestScore({ score }) {
 function NextDeadlineCard({ assignment }) {
   const hasAttempt = assignment.last_verdicts.length > 0;
   return (
-    <Card className="flex flex-wrap items-center gap-6 bg-gradient-to-r from-[#1b1c3a] to-surface p-7">
+    <Card className="flex flex-wrap items-center gap-6 bg-gradient-to-r from-[#1b1c3a] to-card p-7">
       <IconBadge icon={CalendarDays} />
       <div className="min-w-0 flex-1">
-        <p className="text-sm text-muted">Next deadline, {formatDay(assignment.due_at).replace(",", " at")}</p>
+        <p className="text-sm text-ink-3">Next deadline, {formatDay(assignment.due_at).replace(",", " at")}</p>
         <h2 className="mt-2 text-2xl font-semibold">{assignment.title}</h2>
-        <p className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted">
+        <p className="mt-3 flex flex-wrap items-center gap-3 text-sm text-ink-3">
           <VerdictSquares verdicts={assignment.last_verdicts} total={assignment.test_count} />
           {hasAttempt
             ? `${passedOf(assignment.last_verdicts)} of ${assignment.test_count} tests pass in your last attempt`
@@ -69,7 +69,7 @@ function AssignmentsTable({ assignments }) {
       <CardHeader
         icon={Code2}
         title="Your assignments"
-        right={<span className="text-sm text-muted">by deadline</span>}
+        right={<span className="text-sm text-ink-3">by deadline</span>}
       />
       {assignments.length === 0 ? (
         <EmptyState title="No assignments yet">
@@ -77,7 +77,7 @@ function AssignmentsTable({ assignments }) {
         </EmptyState>
       ) : (
         <table className="w-full text-left">
-          <thead className="bg-raised text-sm text-muted">
+          <thead className="bg-black/35 text-sm text-ink-3">
             <tr>
               <th className="px-7 py-3 font-semibold">Assignment</th>
               <th className="px-3 py-3 font-semibold">Due</th>
@@ -97,20 +97,20 @@ function AssignmentsTable({ assignments }) {
               else if (assignment.status === "closed") due = "Closed";
               else if (assignment.due_at) due = capitalize(formatDay(assignment.due_at));
               return (
-                <tr key={assignment.id} className="border-t border-line hover:bg-raised/60">
+                <tr key={assignment.id} className="border-t border-edge hover:bg-black/25">
                   <td className="px-7 py-4">
                     <Link to={`/assignments/${assignment.id}`} className="flex items-stretch gap-4">
                       <span
-                        className={`w-1 shrink-0 rounded-full ${courseBarClass(assignment.course_color)}`}
+                        className={`w-1 shrink-0 ${courseBarClass(assignment.course_color)}`}
                         aria-hidden="true"
                       />
                       <span>
                         <span className="block font-semibold">{assignment.title}</span>
-                        <span className="block text-sm text-muted">{assignment.course_title}</span>
+                        <span className="block text-sm text-ink-3">{assignment.course_title}</span>
                       </span>
                     </Link>
                   </td>
-                  <td className={`px-3 py-4 ${urgent ? "font-semibold text-fail" : "text-ink/90"}`}>{due}</td>
+                  <td className={`px-3 py-4 ${urgent ? "font-semibold text-bad" : "text-ink/90"}`}>{due}</td>
                   <td className="px-3 py-4">
                     <VerdictSquares verdicts={assignment.last_verdicts} total={assignment.test_count} />
                   </td>
@@ -136,20 +136,20 @@ function ToReviewCard({ concepts }) {
         title="To review"
         border={false}
         right={
-          <Link to="/report" className="text-sm font-semibold text-accent-soft hover:text-white">
+          <Link to="/report" className="text-sm font-semibold text-accent-strong hover:text-white">
             Report
           </Link>
         }
       />
       {concepts.length === 0 ? (
-        <p className="px-7 pb-7 text-sm text-muted">Nothing to review right now.</p>
+        <p className="px-7 pb-7 text-sm text-ink-3">Nothing to review right now.</p>
       ) : (
         <ul className="space-y-5 px-7 pb-7">
           {concepts.map((concept) => (
             <li key={concept.concept} className="flex items-center justify-between gap-4">
               <span>
                 <span className="block font-semibold">{concept.concept}</span>
-                <span className="block text-sm text-muted">
+                <span className="block text-sm text-ink-3">
                   {concept.passed} of {plural(concept.total, "test")}
                 </span>
               </span>
@@ -167,18 +167,18 @@ function RecentSubmissionsCard({ submissions }) {
     <Card className="overflow-hidden">
       <CardHeader icon={List} title="Recent submissions" />
       {submissions.length === 0 ? (
-        <p className="px-7 py-6 text-sm text-muted">Your submissions will appear here.</p>
+        <p className="px-7 py-6 text-sm text-ink-3">Your submissions will appear here.</p>
       ) : (
         <ul>
           {submissions.map((submission) => (
-            <li key={submission.id} className="border-b border-line last:border-b-0">
+            <li key={submission.id} className="border-b border-edge last:border-b-0">
               <Link
                 to={`/assignments/${submission.assignment_id}`}
-                className="flex items-center justify-between gap-4 px-7 py-4 hover:bg-raised/60"
+                className="flex items-center justify-between gap-4 px-7 py-4 hover:bg-black/25"
               >
                 <span>
                   <span className="block">{submission.assignment_title}</span>
-                  <span className="block text-sm text-muted">{formatDay(submission.created_at)}</span>
+                  <span className="block text-sm text-ink-3">{formatDay(submission.created_at)}</span>
                 </span>
                 <VerdictSquares verdicts={submission.verdicts} />
               </Link>

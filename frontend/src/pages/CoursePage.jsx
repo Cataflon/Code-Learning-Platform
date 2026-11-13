@@ -47,15 +47,15 @@ export function ResultBar({ buckets, submitted, enrolled }) {
   return (
     <div>
       <div
-        className="flex h-2.5 w-full overflow-hidden rounded-full bg-idle"
+        className="flex h-2.5 w-full overflow-hidden bg-idle"
         role="img"
         aria-label={`${buckets.full} passed all tests, ${buckets.partial} passed some, ${buckets.none} passed none`}
       >
-        <span className="bg-pass" style={{ width: width(buckets.full) }} />
+        <span className="bg-ok" style={{ width: width(buckets.full) }} />
         <span className="bg-warn" style={{ width: width(buckets.partial) }} />
-        <span className="bg-fail" style={{ width: width(buckets.none) }} />
+        <span className="bg-bad" style={{ width: width(buckets.none) }} />
       </div>
-      <p className="mt-2 text-sm text-muted">
+      <p className="mt-2 text-sm text-ink-3">
         {submitted} of {enrolled} submitted
       </p>
     </div>
@@ -93,7 +93,7 @@ function AssignmentsCard({ courseId }) {
         }
       />
       {isPending && <LoadingState />}
-      {isError && <p className="px-7 py-5 text-sm text-fail">{error.message}</p>}
+      {isError && <p className="px-7 py-5 text-sm text-bad">{error.message}</p>}
       {(create.isError || publish.isError) && (
         <div className="px-7 pt-4">
           <FormError>{(create.error ?? publish.error).message}</FormError>
@@ -105,7 +105,7 @@ function AssignmentsCard({ courseId }) {
       {assignments?.length > 0 && (
         <>
           <table className="w-full text-left">
-            <thead className="bg-raised text-sm text-muted">
+            <thead className="bg-black/35 text-sm text-ink-3">
               <tr>
                 <th className="px-7 py-3 font-semibold">Assignment</th>
                 <th className="px-3 py-3 font-semibold">Status</th>
@@ -118,10 +118,10 @@ function AssignmentsCard({ courseId }) {
                 const chip = STATUS_CHIP[assignment.status];
                 const isDraft = assignment.status === "draft";
                 return (
-                  <tr key={assignment.id} className="border-t border-line">
+                  <tr key={assignment.id} className="border-t border-edge">
                     <td className="px-7 py-5">
                       <span className="block font-semibold">{assignment.title}</span>
-                      <span className="block text-sm text-muted">{describe(assignment)}</span>
+                      <span className="block text-sm text-ink-3">{describe(assignment)}</span>
                     </td>
                     <td className="px-3 py-5">
                       <Chip tone={chip.tone} icon={chip.icon}>
@@ -130,7 +130,7 @@ function AssignmentsCard({ courseId }) {
                     </td>
                     <td className="w-64 px-3 py-5">
                       {isDraft ? (
-                        <span className="text-sm text-muted">Students can't see it yet.</span>
+                        <span className="text-sm text-ink-3">Students can't see it yet.</span>
                       ) : (
                         <ResultBar
                           buckets={assignment.result_buckets ?? { full: 0, partial: 0, none: 0 }}
@@ -163,15 +163,15 @@ function AssignmentsCard({ courseId }) {
               })}
             </tbody>
           </table>
-          <p className="flex flex-wrap gap-6 border-t border-line px-7 py-4 text-sm text-muted">
+          <p className="flex flex-wrap gap-6 border-t border-edge px-7 py-4 text-sm text-ink-3">
             <span className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-sm bg-pass" /> passed all tests
+              <span className="h-3 w-3 bg-ok" /> passed all tests
             </span>
             <span className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-sm bg-warn" /> passed some
+              <span className="h-3 w-3 bg-warn" /> passed some
             </span>
             <span className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-sm bg-fail" /> passed none
+              <span className="h-3 w-3 bg-bad" /> passed none
             </span>
           </p>
         </>
@@ -210,12 +210,12 @@ function EnrollmentCodeCard({ course }) {
       <CardHeader icon={Ticket} title="Enrollment code" border={false} />
       <div className="space-y-5 px-7 pb-7">
         <p
-          className="rounded-lg border border-dashed border-accent/60 bg-raised py-6 text-center font-mono text-3xl tracking-[0.3em]"
+          className="border border-dashed border-accent/60 bg-black/35 py-6 text-center font-mono text-3xl tracking-[0.3em]"
           aria-label="Enrollment code"
         >
           {course.join_code}
         </p>
-        <p className="text-sm text-muted">Students enter this code on their profile to join the course.</p>
+        <p className="text-sm text-ink-3">Students enter this code on their profile to join the course.</p>
         <div className="grid grid-cols-2 gap-3">
           <Button variant="outline" onClick={copy}>
             <Copy className="h-4 w-4" aria-hidden="true" />
@@ -256,9 +256,9 @@ function ConceptsCard({ courseId }) {
           {concepts?.map((concept) => (
             <Chip key={concept.id}>{concept.name}</Chip>
           ))}
-          {concepts?.length === 0 && <span className="text-sm text-muted">No concepts yet.</span>}
+          {concepts?.length === 0 && <span className="text-sm text-ink-3">No concepts yet.</span>}
           {!adding && (
-            <button type="button" className="px-2 text-sm text-muted hover:text-ink" onClick={() => setAdding(true)}>
+            <button type="button" className="px-2 text-sm text-ink-3 hover:text-ink" onClick={() => setAdding(true)}>
               Add concept
             </button>
           )}
@@ -322,11 +322,11 @@ export default function CoursePage() {
           )
         }
       />
-      <div className="mb-9 flex gap-2 border-b border-line" role="tablist" aria-label="Course sections">
+      <div className="mb-9 flex gap-2 border-b border-edge" role="tablist" aria-label="Course sections">
         <span
           role="tab"
           aria-selected="true"
-          className="-mb-px border-b-2 border-accent-soft px-6 py-3 font-semibold text-accent-soft"
+          className="-mb-px border-b-2 border-accent-strong px-6 py-3 font-semibold text-accent-strong"
         >
           Assignments
         </span>

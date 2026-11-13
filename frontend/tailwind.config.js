@@ -1,36 +1,37 @@
-/** Design tokens for mockup variant D (dark theme). Defined once, reused everywhere. */
+/**
+ * Design tokens of the 8-bit theme (docs/design-8bit/DESIGN.md, section 2).
+ * Defined once here and as CSS variables in src/index.css; components only use these names.
+ */
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {
       colors: {
-        bg: "#0e0f1a", // page background, almost black
-        header: "#161826",
-        surface: "#171927", // cards
-        raised: "#1f2133", // inputs, table headers, inner boxes
-        line: "#2a2d45", // borders
-        ink: "#ffffff",
-        muted: "#9a9cb5",
-        faint: "#6b6e8a",
-        accent: {
-          DEFAULT: "#5b57e0", // primary buttons
-          hover: "#6a66ee",
-          soft: "#b4b1ff", // links, chip text
-          tint: "#25264a", // chip / active nav background
-        },
-        pass: { DEFAULT: "#4ade80", tint: "#14301f", line: "#1f5a35" },
-        fail: { DEFAULT: "#f87171", tint: "#3a1519", line: "#7a2a2f" },
-        warn: { DEFAULT: "#fbbf24", tint: "#33270b", line: "#6b4f10" },
-        info: { DEFAULT: "#60a5fa", tint: "#13233d", line: "#234a80" },
-        hidden: { DEFAULT: "#c084fc", tint: "#2c1a47" },
-        idle: "#2b2d44", // empty verdict square
+        bg: "#000000",
+        card: "#0a0d22",
+        edge: "#2b3366",
+        ink: { DEFAULT: "#f5f2ff", 2: "#c9c5e6", 3: "#8d89b3" },
+        accent: { DEFAULT: "#8b7bff", strong: "#b3a8ff", fill: "#7a64ff" },
+        ok: "#5ee08c",
+        bad: "#ff6684",
+        warn: "#ffbe4f",
+        blue: "#5cc6ff",
+        pink: "#ff92d4",
+        idle: "#262c55",
       },
       fontFamily: {
-        sans: ["Poppins", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "ui-monospace", "monospace"],
+        // Titles, buttons, logo, big numbers.
+        display: ['"Press Start 2P"', '"Courier New"', "monospace"],
+        // Interface text: menu, labels, meta, lists, chips.
+        pixel: ['"Pixelify Sans"', "VT323", '"Courier New"', "monospace"],
+        // Timers, page numbers, PDF/PPTX labels.
+        term: ["VT323", '"Courier New"', "monospace"],
+        // What the student reads to understand the task or a failure.
+        plain: ["Inter", "system-ui", "-apple-system", '"Segoe UI"', "sans-serif"],
+        mono: ['"JetBrains Mono"', "ui-monospace", "Menlo", "Consolas", "monospace"],
       },
-      borderRadius: {
-        card: "14px",
+      maxWidth: {
+        content: "1152px", // 1120 px column + 2 x 16 px gutter
       },
     },
   },

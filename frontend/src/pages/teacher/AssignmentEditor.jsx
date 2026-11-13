@@ -123,7 +123,7 @@ function EditorForm({ assignment, initialTests, concepts, onSaved, onCreateConce
           <CardHeader icon={Pencil} title="Details" border={false} />
           <div className="space-y-5 px-7 pb-7">
             <TextField label="Title" value={details.title} onChange={set("title")} maxLength={200} />
-            <label className="block text-sm font-semibold text-accent-soft/90">
+            <label className="block text-sm font-semibold text-ink-2">
               Problem, in Markdown
               <textarea
                 className={`${inputClass} mt-2 min-h-44 resize-y font-normal`}
@@ -132,7 +132,7 @@ function EditorForm({ assignment, initialTests, concepts, onSaved, onCreateConce
               />
             </label>
             <TextField label="Due" type="datetime-local" value={details.due_at} onChange={set("due_at")} />
-            <label className="block text-sm font-semibold text-accent-soft/90">
+            <label className="block text-sm font-semibold text-ink-2">
               Language
               <select className={`${inputClass} mt-2 font-normal`} value="python" disabled>
                 <option value="python">Python 3.12</option>
@@ -195,7 +195,7 @@ export default function AssignmentEditor() {
   return (
     <>
       {savedAt && (
-        <p className="mb-4 rounded-lg border border-pass-line bg-pass-tint px-4 py-3 text-sm text-pass" role="status">
+        <p className="mb-4 border border-ok/40 bg-ok/15 px-4 py-3 text-sm text-ok" role="status">
           Saved.
         </p>
       )}

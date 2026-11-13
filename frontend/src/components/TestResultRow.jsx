@@ -12,8 +12,8 @@ const FAILURE_TEXT = {
 
 function Block({ label, text }) {
   return (
-    <div className="min-w-0 rounded-lg border border-line bg-raised px-3 py-2">
-      <div className="text-xs text-muted">{label}</div>
+    <div className="min-w-0 border border-edge bg-black/35 px-3 py-2">
+      <div className="text-xs text-ink-3">{label}</div>
       <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-sm">
         {text === "" ? "(empty)" : text}
       </pre>
@@ -40,7 +40,7 @@ export default function TestResultRow({ result, running = false }) {
   const hasDetails = failed && result.expected_output != null;
 
   return (
-    <li className={`border-t border-line px-7 py-4 ${failed ? "bg-fail-tint/70" : ""}`}>
+    <li className={`border-t border-edge px-7 py-4 ${failed ? "bg-bad/15" : ""}`}>
       <div className="flex flex-wrap items-center gap-3">
         {badge}
         <span className="font-semibold">{result.name}</span>
@@ -49,13 +49,13 @@ export default function TestResultRow({ result, running = false }) {
           {result.concepts.map((concept) => (
             <Chip key={concept}>{concept}</Chip>
           ))}
-          <span className="w-16 text-right text-sm text-muted">
+          <span className="w-16 text-right text-sm text-ink-3">
             {result.runtime_ms != null ? `${result.runtime_ms} ms` : ""}
           </span>
         </span>
       </div>
       {failed && (
-        <p className="mt-3 text-sm text-fail">
+        <p className="mt-3 text-sm text-bad">
           {FAILURE_TEXT[verdict] ?? "This test failed."}
           {result.hint && <> Hint from your teacher: {result.hint}</>}
         </p>

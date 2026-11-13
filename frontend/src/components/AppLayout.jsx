@@ -15,8 +15,8 @@ const TEACHER_NAV = [{ to: "/courses", label: "My courses", icon: MessageSquare 
 
 function navClass({ isActive }) {
   return (
-    "flex items-center gap-2.5 rounded-lg px-4 py-2.5 transition-colors " +
-    (isActive ? "bg-accent-tint font-semibold text-accent-soft" : "text-muted hover:text-ink")
+    "flex items-center gap-2.5 px-4 py-2.5 transition-colors " +
+    (isActive ? "bg-accent/20 font-semibold text-accent-strong" : "text-ink-3 hover:text-ink")
   );
 }
 
@@ -27,7 +27,7 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-line bg-header">
+      <header className="border-b border-edge bg-header">
         <div className="flex items-center gap-8 px-6 py-3">
           <Link to={homePathFor(user)} aria-label="Autograder home">
             <Logo />
@@ -42,12 +42,12 @@ export default function AppLayout() {
           </nav>
           <Link
             to="/profile"
-            className="flex items-center gap-4 rounded-lg px-2 py-1 hover:bg-raised"
+            className="flex items-center gap-4 px-2 py-1 hover:bg-black/35"
             aria-label="Your profile"
           >
             <span className="text-right leading-tight">
               <span className="block font-semibold">{user.full_name}</span>
-              <span className="block text-sm capitalize text-muted">{user.role}</span>
+              <span className="block text-sm capitalize text-ink-3">{user.role}</span>
             </span>
             <Avatar name={user.full_name} />
           </Link>

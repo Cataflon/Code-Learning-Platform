@@ -17,7 +17,7 @@ export default function AuthShell({ children }) {
             Your code runs in isolation within seconds. You also see which concepts you still need
             to review.
           </p>
-          <div className="mt-8 max-w-sm rounded-card border border-white/10 bg-[#2a2766]/90 p-5">
+          <div className="mt-8 max-w-sm border border-white/10 bg-[#2a2766]/90 p-5">
             <div className="flex items-baseline justify-between">
               <span className="font-semibold">Digit sum</span>
               <span className="text-sm text-white/70">third attempt</span>

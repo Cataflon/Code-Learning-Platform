@@ -26,10 +26,10 @@ const FILTERS = [
 const BAND_COLORS = ["#f87171", "#fb923c", "#fbbf24", "#a3e635", "#4ade80"];
 
 function rateColor(rate) {
-  if (rate == null) return { text: "text-muted", bar: "bg-idle" };
-  if (rate < 0.5) return { text: "text-fail", bar: "bg-fail" };
+  if (rate == null) return { text: "text-ink-3", bar: "bg-idle" };
+  if (rate < 0.5) return { text: "text-bad", bar: "bg-bad" };
   if (rate < 0.8) return { text: "text-warn", bar: "bg-warn" };
-  return { text: "text-pass", bar: "bg-pass" };
+  return { text: "text-ok", bar: "bg-ok" };
 }
 
 function PassRateCard({ tests }) {
@@ -40,7 +40,7 @@ function PassRateCard({ tests }) {
     <Card>
       <CardHeader icon={FlaskConical} title="Pass rate per test" border={false} />
       <div className="space-y-5 px-7 pb-7">
-        {tests.length === 0 && <p className="text-sm text-muted">This assignment has no tests.</p>}
+        {tests.length === 0 && <p className="text-sm text-ink-3">This assignment has no tests.</p>}
         {tests.map((test) => {
           const color = rateColor(test.pass_rate);
           const percent = test.pass_rate == null ? null : Math.round(test.pass_rate * 100);
@@ -51,14 +51,14 @@ function PassRateCard({ tests }) {
                 {test.is_hidden && <Chip tone="neutral">hidden</Chip>}
                 <span className={`ml-auto font-semibold ${color.text}`}>{percent == null ? "–" : `${percent}%`}</span>
               </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-idle">
+              <div className="mt-2 h-2 overflow-hidden bg-idle">
                 <div className={`h-full ${color.bar}`} style={{ width: `${percent ?? 0}%` }} />
               </div>
             </div>
           );
         })}
         {weakest && weakest.pass_rate < 0.5 && (
-          <p className="rounded-lg border border-fail-line bg-fail-tint px-4 py-3 text-sm text-fail">
+          <p className="border border-bad/40 bg-bad/15 px-4 py-3 text-sm text-bad">
             Only {Math.round(weakest.pass_rate * 100)}% pass “{weakest.name}”
             {weakest.concepts.length > 0 && <>, which checks the concept “{weakest.concepts.join(", ")}”</>}.
           </p>
@@ -75,7 +75,7 @@ function ScoreDistributionCard({ distribution }) {
       <CardHeader icon={BarChart3} title="Score distribution" border={false} />
       <div className="px-5 pb-6">
         {total === 0 ? (
-          <p className="px-2 text-sm text-muted">No finished submissions yet.</p>
+          <p className="px-2 text-sm text-ink-3">No finished submissions yet.</p>
         ) : (
           <>
             <div className="h-56" aria-hidden="true">
@@ -125,13 +125,13 @@ function CodeDialog({ submissionId, onClose }) {
       }
     >
       {isPending && <LoadingState />}
-      {isError && <p className="px-7 pb-6 text-fail">{error.message}</p>}
+      {isError && <p className="px-7 pb-6 text-bad">{error.message}</p>}
       {data && (
         <>
-          <pre className="mx-7 mb-6 max-h-80 overflow-auto rounded-lg border border-line bg-raised p-4 font-mono text-sm">
+          <pre className="mx-7 mb-6 max-h-80 overflow-auto border border-edge bg-black/35 p-4 font-mono text-sm">
             {data.code}
           </pre>
-          {data.error_message && <p className="px-7 pb-4 text-sm text-fail">{data.error_message}</p>}
+          {data.error_message && <p className="px-7 pb-4 text-sm text-bad">{data.error_message}</p>}
           <ul>
             {data.results.map((result) => (
               <TestResultRow key={result.test_case_id} result={result} />
@@ -220,7 +220,7 @@ export default function SubmissionsPage() {
             border={false}
             right={
               <label className="relative block w-64">
-                <Search className="absolute left-4 top-3.5 h-4 w-4 text-muted" aria-hidden="true" />
+                <Search className="absolute left-4 top-3.5 h-4 w-4 text-ink-3" aria-hidden="true" />
                 <input
                   className={`${inputClass} pl-11`}
                   placeholder="Search for a student"
@@ -242,8 +242,8 @@ export default function SubmissionsPage() {
                   setFilter(key);
                   setPage(1);
                 }}
-                className={`rounded-lg border px-4 py-2 text-sm font-semibold ${
-                  filter === key ? "border-accent bg-accent text-white" : "border-line text-ink hover:bg-raised"
+                className={`border px-4 py-2 text-sm font-semibold ${
+                  filter === key ? "border-accent bg-accent text-white" : "border-edge text-ink hover:bg-black/35"
                 }`}
               >
                 {label} {counts ? counts[key] : ""}
@@ -251,11 +251,11 @@ export default function SubmissionsPage() {
             ))}
           </div>
           {list.isPending && <LoadingState />}
-          {list.isError && <p className="px-7 pb-6 text-fail">{list.error.message}</p>}
+          {list.isError && <p className="px-7 pb-6 text-bad">{list.error.message}</p>}
           {list.data && (
             <>
               <SubmissionsTable submissions={list.data.items} onShowCode={setCodeId} />
-              <div className="border-t border-line">
+              <div className="border-t border-edge">
                 <Pagination page={page} pageSize={PAGE_SIZE} total={list.data.total} onPageChange={setPage} />
               </div>
             </>

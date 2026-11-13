@@ -48,7 +48,7 @@ export default function RegisterPage() {
   return (
     <AuthShell>
       <h2 className="text-4xl font-bold">Create account</h2>
-      <p className="mt-3 text-muted">Join your courses and start submitting.</p>
+      <p className="mt-3 text-ink-3">Join your courses and start submitting.</p>
       <form className="mt-8 space-y-5" onSubmit={handleSubmit} noValidate>
         <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Account type">
           {ROLES.map((role) => (
@@ -59,10 +59,10 @@ export default function RegisterPage() {
               aria-checked={form.role === role.value}
               onClick={() => setForm((old) => ({ ...old, role: role.value }))}
               className={
-                "rounded-lg border px-4 py-2.5 text-sm font-semibold " +
+                "border px-4 py-2.5 text-sm font-semibold " +
                 (form.role === role.value
-                  ? "border-accent-soft bg-accent-tint text-accent-soft"
-                  : "border-line text-muted hover:text-ink")
+                  ? "border-accent-strong bg-accent/20 text-accent-strong"
+                  : "border-edge text-ink-3 hover:text-ink")
               }
             >
               {role.label}
@@ -114,9 +114,9 @@ export default function RegisterPage() {
           {busy ? "Creating…" : "Create account"}
         </Button>
       </form>
-      <p className="mt-8 text-center text-muted">
+      <p className="mt-8 text-center text-ink-3">
         Already have an account?{" "}
-        <Link to="/login" className="font-semibold text-accent-soft hover:text-white">
+        <Link to="/login" className="font-semibold text-accent-strong hover:text-white">
           Sign in
         </Link>
       </p>

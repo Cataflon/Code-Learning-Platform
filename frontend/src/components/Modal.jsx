@@ -28,7 +28,7 @@ export default function Modal({ title, subtitle, icon, onClose, children, footer
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`w-full rounded-card border border-line bg-surface shadow-2xl outline-none ${
+        className={`w-full border border-edge bg-card shadow-2xl outline-none ${
           wide ? "max-w-4xl" : "max-w-2xl"
         }`}
       >
@@ -38,19 +38,19 @@ export default function Modal({ title, subtitle, icon, onClose, children, footer
             <h2 id={titleId} className="text-xl font-semibold">
               {title}
             </h2>
-            {subtitle && <p className="mt-1 text-muted">{subtitle}</p>}
+            {subtitle && <p className="mt-1 text-ink-3">{subtitle}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close dialog"
-            className="rounded-lg border border-line p-2 text-muted hover:text-ink"
+            className="border border-edge p-2 text-ink-3 hover:text-ink"
           >
             <X className="h-4 w-4" />
           </button>
         </header>
         {children}
-        {footer && <footer className="flex justify-end gap-3 border-t border-line px-7 py-5">{footer}</footer>}
+        {footer && <footer className="flex justify-end gap-3 border-t border-edge px-7 py-5">{footer}</footer>}
       </div>
     </div>
   );

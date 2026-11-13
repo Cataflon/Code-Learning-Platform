@@ -22,19 +22,19 @@ function CourseAssignments({ course }) {
             subtitle={`${course.teacher_name}, ${plural(course.assignment_count, "assignment")}`}
           />
           {isPending && <LoadingState />}
-          {isError && <p className="px-7 py-5 text-sm text-fail">{error.message}</p>}
+          {isError && <p className="px-7 py-5 text-sm text-bad">{error.message}</p>}
           {data?.length === 0 && (
-            <p className="px-7 py-5 text-sm text-muted">No assignments published yet.</p>
+            <p className="px-7 py-5 text-sm text-ink-3">No assignments published yet.</p>
           )}
           <ul>
             {data?.map((assignment) => (
-              <li key={assignment.id} className="border-b border-line last:border-b-0">
+              <li key={assignment.id} className="border-b border-edge last:border-b-0">
                 <Link
                   to={`/assignments/${assignment.id}`}
-                  className="flex flex-wrap items-center gap-4 px-7 py-4 hover:bg-raised"
+                  className="flex flex-wrap items-center gap-4 px-7 py-4 hover:bg-black/35"
                 >
                   <span className="flex-1 font-semibold">{assignment.title}</span>
-                  <span className="text-sm text-muted">
+                  <span className="text-sm text-ink-3">
                     {assignment.due_at ? `Due ${formatDay(assignment.due_at)}` : "No deadline"}
                   </span>
                   <Chip tone={assignment.status === "open" ? "info" : "neutral"}>
@@ -61,7 +61,7 @@ export function JoinCourseForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <label htmlFor="join-code" className="block text-sm font-semibold text-accent-soft/90">
+      <label htmlFor="join-code" className="block text-sm font-semibold text-ink-2">
         Join a course
       </label>
       <div className="flex gap-4">

@@ -41,7 +41,7 @@ function NewCourseForm() {
           maxLength={200}
         />
         <div>
-          <span className="mb-2 block text-sm font-semibold text-accent-soft/90">Color</span>
+          <span className="mb-2 block text-sm font-semibold text-ink-2">Color</span>
           <div className="flex gap-2 py-2" role="radiogroup" aria-label="Course color">
             {COURSE_COLORS.map((name) => (
               <button
@@ -51,7 +51,7 @@ function NewCourseForm() {
                 aria-checked={color === name}
                 aria-label={name}
                 onClick={() => setColor(name)}
-                className={`h-8 w-8 rounded-full ${courseBarClass(name)} ${
+                className={`h-8 w-8 ${courseBarClass(name)} ${
                   color === name ? "ring-2 ring-white ring-offset-2 ring-offset-surface" : "opacity-60"
                 }`}
               />
@@ -89,12 +89,12 @@ export default function TeacherCoursesPage() {
           <div className="grid gap-9 md:grid-cols-2 lg:grid-cols-3">
             {courses.map((course) => (
               <Link key={course.id} to={`/courses/${course.id}`} className="group">
-                <Card className="flex h-full overflow-hidden group-hover:border-accent-soft/60">
+                <Card className="flex h-full overflow-hidden group-hover:border-accent-strong/60">
                   <span className={`w-2 shrink-0 ${courseBarClass(course.color)}`} aria-hidden="true" />
                   <div className="p-7">
                     <h2 className="text-xl font-semibold">{course.title}</h2>
-                    <p className="mt-2 text-sm text-muted">{plural(course.assignment_count, "assignment")}</p>
-                    <p className="mt-4 font-mono tracking-widest text-accent-soft">{course.join_code}</p>
+                    <p className="mt-2 text-sm text-ink-3">{plural(course.assignment_count, "assignment")}</p>
+                    <p className="mt-4 font-mono tracking-widest text-accent-strong">{course.join_code}</p>
                   </div>
                 </Card>
               </Link>

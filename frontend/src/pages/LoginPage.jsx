@@ -34,9 +34,9 @@ export default function LoginPage() {
   return (
     <AuthShell>
       <h2 className="text-4xl font-bold">Welcome back</h2>
-      <p className="mt-3 text-muted">Sign in to continue your assignments.</p>
+      <p className="mt-3 text-ink-3">Sign in to continue your assignments.</p>
       {location.state?.registered && (
-        <p className="mt-4 rounded-lg border border-pass-line bg-pass-tint px-4 py-3 text-sm text-pass">
+        <p className="mt-4 border border-ok/40 bg-ok/15 px-4 py-3 text-sm text-ok">
           Account created. You can sign in now.
         </p>
       )}
@@ -63,7 +63,7 @@ export default function LoginPage() {
           />
           <button
             type="button"
-            className="absolute right-3 top-[42px] p-1 text-muted hover:text-ink"
+            className="absolute right-3 top-[42px] p-1 text-ink-3 hover:text-ink"
             onClick={() => setShowPassword((shown) => !shown)}
             aria-label={showPassword ? "Hide password" : "Show password"}
           >
@@ -75,9 +75,9 @@ export default function LoginPage() {
           {busy ? "Signing in…" : "Sign in"}
         </Button>
       </form>
-      <p className="mt-8 text-center text-muted">
+      <p className="mt-8 text-center text-ink-3">
         No account?{" "}
-        <Link to="/register" className="font-semibold text-accent-soft hover:text-white">
+        <Link to="/register" className="font-semibold text-accent-strong hover:text-white">
           Create one
         </Link>
       </p>

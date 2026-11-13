@@ -1,14 +1,14 @@
 import { Check, X } from "lucide-react";
 
 const COLORS = {
-  passed: "bg-pass",
-  running: "bg-info/60",
+  passed: "bg-ok",
+  running: "bg-blue/60",
   pending: "bg-idle",
 };
 
 export function verdictColor(verdict) {
   if (verdict == null) return COLORS.pending;
-  return COLORS[verdict] ?? "bg-fail"; // every failing verdict is red
+  return COLORS[verdict] ?? "bg-bad"; // every failing verdict is red
 }
 
 export function verdictLabel(verdict) {
@@ -34,7 +34,7 @@ export default function VerdictSquares({ verdicts = [], total, large = false }) 
   const count = Math.max(total ?? 0, verdicts.length);
   const cells = Array.from({ length: count }, (_, index) => verdicts[index] ?? null);
   const passed = cells.filter((verdict) => verdict === "passed").length;
-  const size = large ? "h-9 w-9 rounded-lg" : "h-4 w-4 rounded";
+  const size = large ? "h-9 w-9" : "h-4 w-4";
 
   return (
     <span
@@ -48,9 +48,9 @@ export default function VerdictSquares({ verdicts = [], total, large = false }) 
           title={`Test ${index + 1}: ${verdictLabel(verdict)}`}
           className={`flex items-center justify-center ${size} ${verdictColor(verdict)}`}
         >
-          {large && verdict === "passed" && <Check className="h-4 w-4 text-pass-tint" strokeWidth={3} />}
+          {large && verdict === "passed" && <Check className="h-4 w-4 text-ok/15" strokeWidth={3} />}
           {large && verdict && verdict !== "passed" && verdict !== "running" && (
-            <X className="h-4 w-4 text-fail-tint" strokeWidth={3} />
+            <X className="h-4 w-4 text-bad/15" strokeWidth={3} />
           )}
         </span>
       ))}

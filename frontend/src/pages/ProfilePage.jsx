@@ -18,7 +18,7 @@ const WEEKS = 14;
 
 function Saved({ children }) {
   return (
-    <p className="text-sm text-pass" role="status">
+    <p className="text-sm text-ok" role="status">
       {children}
     </p>
   );
@@ -131,17 +131,17 @@ function YourCourses({ isStudent }) {
       <CardHeader icon={MessageSquare} title="Your courses" />
       {isPending && <LoadingState />}
       {courses?.length === 0 && (
-        <p className="px-7 py-6 text-sm text-muted">
+        <p className="px-7 py-6 text-sm text-ink-3">
           {isStudent ? "You are not enrolled in any course yet." : "You have not created a course yet."}
         </p>
       )}
       <ul>
         {courses?.map((course) => (
-          <li key={course.id} className="flex items-center gap-4 border-b border-line px-7 py-4">
-            <span className={`h-12 w-1 shrink-0 rounded-full ${courseBarClass(course.color)}`} aria-hidden="true" />
+          <li key={course.id} className="flex items-center gap-4 border-b border-edge px-7 py-4">
+            <span className={`h-12 w-1 shrink-0 ${courseBarClass(course.color)}`} aria-hidden="true" />
             <span className="min-w-0 flex-1">
               <span className="block font-semibold">{course.title}</span>
-              <span className="block text-sm text-muted">
+              <span className="block text-sm text-ink-3">
                 {course.teacher_name}, {plural(course.assignment_count, "assignment")}
               </span>
             </span>
@@ -159,7 +159,7 @@ function YourCourses({ isStudent }) {
         </div>
       )}
       {isStudent && (
-        <div className="bg-raised/60 px-7 py-6">
+        <div className="bg-black/25 px-7 py-6">
           <JoinCourseForm />
         </div>
       )}
@@ -185,7 +185,7 @@ export default function ProfilePage() {
         right={
           <div className="text-right">
             <div className="font-semibold capitalize">{user.role}</div>
-            <div className="text-sm text-muted">Member since {monthYear(user.created_at)}</div>
+            <div className="text-sm text-ink-3">Member since {monthYear(user.created_at)}</div>
           </div>
         }
       />
@@ -196,7 +196,7 @@ export default function ProfilePage() {
               <Avatar name={user.full_name} size="lg" />
               <div className="min-w-0 flex-1">
                 <h2 className="text-2xl font-semibold">{user.full_name}</h2>
-                <p className="text-muted">{user.email}</p>
+                <p className="text-ink-3">{user.email}</p>
               </div>
               {isStudent && totals && (
                 <div className="flex gap-10">
@@ -207,10 +207,10 @@ export default function ProfilePage() {
               )}
             </div>
             {isStudent && (
-              <div className="border-t border-line p-7">
+              <div className="border-t border-edge p-7">
                 <div className="mb-5 flex items-baseline justify-between">
                   <h3 className="font-semibold">Activity</h3>
-                  <span className="text-sm text-muted">submissions per day, last {WEEKS} weeks</span>
+                  <span className="text-sm text-ink-3">submissions per day, last {WEEKS} weeks</span>
                 </div>
                 {activity.isPending && <LoadingState />}
                 {activity.isError && <FormError>{activity.error.message}</FormError>}
