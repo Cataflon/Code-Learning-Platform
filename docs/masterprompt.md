@@ -15,7 +15,7 @@ Rol
 Ești inginerul care implementează acest proiect, pas cu pas. Eu sunt proprietarul lui: student în anul 3 la Calculatoare (UTCN), cunosc React, Vite, HTML, CSS și JavaScript și învăț Python și backend-ul REST în timpul proiectului. Este un proiect individual de curs, iar MVP-ul trebuie livrat până în săptămâna 13 din 14. Documentul „Masterprompt și plan de implementare” este singura sursă de adevăr pentru ce se construiește.
 
 Ce se construiește
-O platformă web în care profesorul creează cursuri, teme și teste (fiecare test legat de concepte), încarcă materialele de curs și de laborator (PDF sau PPTX) și, la fiecare temă sau test, alege materialele în care se găsesc informațiile necesare. Studentul trimite cod Python, rulat izolat în Docker, vede verdictul pe fiecare test, primește raportul „unde greșești” pe concepte și, când greșește un test, un popup care îl trimite direct la materialele indicate. Secțiunea Learn îi arată cursurile și materialele lor.
+O platformă web în care profesorul creează cursuri, teme și teste (fiecare test legat de concepte), încarcă materialele de curs și de laborator (PDF sau PPTX) și, la fiecare temă sau test, alege materialele în care se găsesc informațiile necesare. Studentul trimite cod Python, rulat izolat în Docker, vede verdictul pe fiecare test, primește raportul „unde greșești” pe concepte și, când greșește un test, un popup care îl trimite direct la materialele indicate. Secțiunea Learn îi arată cursurile și materialele lor. După MVP, profesorul poate genera testele cu Claude (Pasul 9): modelul propune o soluție de referință și intrările, iar ieșirile așteptate vin doar din rularea soluției în sandbox.
 
 Obiectiv dublu
 1. Livrezi MVP-ul descris în document, complet, curat și testat.
@@ -68,7 +68,7 @@ Platforma lasă profesorul să creeze teme de programare cu teste și să încar
 
 **Constrângeri**
 
-Proiect solo, 10-12 ore pe săptămână, MVP până în săptămâna 13. Doar Python, rulare locală, fără chei API și fără costuri. Demo-ul rulează pe calculatorul tău. Fișierele materialelor stau pe disc, în directorul uploads/ (volum Docker în profilul demo); conversia PPTX în PDF cere LibreOffice instalat (D20).
+Proiect solo, 10-12 ore pe săptămână, MVP până în săptămâna 13. Doar Python, rulare locală, fără costuri obligatorii: singura cheie API este `ANTHROPIC_API_KEY`, opțională, pentru generarea testelor din Pasul 9 (fără ea, funcția nu apare). Demo-ul rulează pe calculatorul tău. Fișierele materialelor stau pe disc, în directorul uploads/ (volum Docker în profilul demo); conversia PPTX în PDF cere LibreOffice instalat (D20).
 
 ## Arhitectura de ansamblu
 
@@ -114,6 +114,8 @@ Fiecare tehnologie are un rol precis în proiect. Tabelele sunt harta rapidă; �
 | ruff | linter și formatter pentru Python | un singur instrument rapid pentru stil și greșeli frecvente | flake8 + black |
 | python-multipart | permite lui FastAPI să primească fișiere încărcate (multipart/form-data) | dependența cerută de FastAPI pentru UploadFile | n/a |
 | pypdf | validează PDF-urile încărcate și numără paginile | bibliotecă Python pură, fără dependențe de sistem | PyMuPDF (licență AGPL) |
+| SDK-ul `anthropic` (Claude) | generează soluția de referință și intrările testelor și alege paginile din materiale (Pasul 9, opțional) | SDK-ul oficial, cu reîncercări și timeout; modelul se schimbă din `AI_MODEL` (D25) | alt furnizor prin aceeași interfață `LLMClient` |
+| Full-text search PostgreSQL (`tsvector`) | găsește paginile candidate din materiale pentru un test (Pasul 9) | deja în PostgreSQL, fără tehnologie nouă (D27) | embeddings cu pgvector |
 | LibreOffice (headless) | convertește PPTX în PDF la încărcare, ca toate materialele să se vadă în același vizualizator | singura cale gratuită și fiabilă de a randa PPTX pe server (decizia D20) | doar PDF în prima versiune; conversie în browser |
 
 **Frontend și infrastructură**
@@ -147,6 +149,7 @@ autograder/
       services/            # logica de business și accesul la date
       api/v1/              # routere: auth.py, courses.py, submissions.py, ...
       runner/              # base.py, subprocess_runner.py, docker_runner.py, compare.py
+      ai/                  # client.py (LLMClient, ClaudeClient, FakeLLMClient), prompts.py, schemas.py (Pasul 9)
       storage/             # file_store.py (salvare, citire, stergere in uploads/), pptx_converter.py (LibreOffice)
     alembic/               # migrările
     scripts/               # seed.py, seed_demo.py
@@ -183,7 +186,7 @@ autograder/
 
 ## Modelul de date
 
-Douăsprezece tabele acoperă tot proiectul: un profesor are cursuri, un curs are teme, o temă are teste, iar o trimitere produce câte un rezultat pe test. Etichetele de concept stau pe teste și alimentează raportul din Pasul 7, iar materialele încărcate de profesor se leagă de teme și de teste prin două tabele de legătură (Pasul 8).
+Paisprezece tabele acoperă tot proiectul (douăsprezece în MVP, plus `generation_jobs` și `material_pages` din Pasul 9): un profesor are cursuri, un curs are teme, o temă are teste, iar o trimitere produce câte un rezultat pe test. Etichetele de concept stau pe teste și alimentează raportul din Pasul 7, iar materialele încărcate de profesor se leagă de teme și de teste prin două tabele de legătură (Pasul 8).
 
 | Entitate | Câmpuri principale | Relații și reguli |
 | --- | --- | --- |
@@ -192,11 +195,13 @@ Douăsprezece tabele acoperă tot proiectul: un profesor are cursuri, un curs ar
 | Enrollment | user\_id, course\_id, created\_at | cheie primară compusă (user\_id, course\_id); doar studenți; înscriere dublă dă 409 |
 | Assignment | id, course\_id, title, description (Markdown), language (`python`), time\_limit\_ms (2000), memory\_limit\_mb (128), due\_at (opțional), is\_published, max\_submissions (10), created\_at | ștergerea cursului șterge temele (cascade); studenții văd doar temele publicate |
 | Concept | id, course\_id, name | unic pe (course\_id, name); etichete libere create de profesor |
-| TestCase | id, assignment\_id, name, input\_data, expected\_output, is\_hidden, weight (1), position | testele ascunse nu își expun conținutul studentului; ordinea după `position` |
+| TestCase | id, assignment\_id, name, input\_data, expected\_output, is\_hidden, weight (1), position, hint (opțional); din Pasul 9: source (`manual` sau `ai`, implicit `manual`), review\_status (`approved` sau `draft`, implicit `approved`), generation\_job\_id (opțional, ON DELETE SET NULL), ai\_rationale (opțional) | testele ascunse nu își expun conținutul studentului; ordinea după `position`; ciornele (`draft`) nu contează la evaluare și nu sunt vizibile studenților |
 | TestCaseConcept | test\_case\_id, concept\_id | tabel de legătură many-to-many: un test poate avea mai multe concepte |
 | Submission | id, assignment\_id, student\_id, code, language, status (`queued`, `running`, `done`, `error`), score (0-100, nul până la final), passed\_count, total\_count, error\_message, created\_at, started\_at, finished\_at | codul are maximum 64 KB; o trimitere nu se modifică după creare, doar statusul și rezultatele |
 | TestResult | id, submission\_id, test\_case\_id, verdict, actual\_output (trunchiat), stderr (trunchiat), runtime\_ms | unic pe (submission\_id, test\_case\_id); verdicte: `passed`, `wrong_answer`, `time_limit`, `memory_limit`, `runtime_error`, `internal_error` |
-| Material | id, course\_id, title, category (`lecture` sau `lab`), file\_type (pdf sau pptx), original\_filename, stored\_filename (uuid generat de server), preview\_filename (PDF-ul obținut din PPTX, nul pentru PDF), size\_bytes, page\_count, uploaded\_by, created\_at | fișierul stă pe disc, în uploads/, nu în baza de date; maximum 20 MB; ștergerea cursului șterge rândurile prin cascade, iar serviciul șterge și fișierele de pe disc |
+| Material | id, course\_id, title, category (`lecture` sau `lab`), file\_type (pdf sau pptx), original\_filename, stored\_filename (uuid generat de server), preview\_filename (PDF-ul obținut din PPTX, nul pentru PDF), size\_bytes, page\_count, uploaded\_by, created\_at | fișierul stă pe disc, în uploads/, nu în baza de date; din Pasul 9 are și text\_pages (implicit 0, câte pagini au text extras; 0 = PDF scanat); maximum 20 MB; ștergerea cursului șterge rândurile prin cascade, iar serviciul șterge și fișierele de pe disc |
+| GenerationJob (Pasul 9) | id, assignment\_id, requested\_by, status (`queued`, `running`, `done`, `error`), reference\_code, model, tests\_proposed, tests\_kept, input\_tokens, output\_tokens, error\_message (opțional), created\_at, started\_at, finished\_at | ștergerea temei șterge joburile (cascade); `reference_code` e vizibil doar profesorului cursului; un singur job activ pe temă |
+| MaterialPage (Pasul 9) | id, material\_id, page\_no (1 = prima pagină a PDF-ului sau a previzualizării), text (normalizat, cel mult 20 000 de caractere), tsv (`tsvector` generat din text, dicționar `simple`) | unic pe (material\_id, page\_no); index GIN pe tsv; ștergerea materialului șterge paginile (cascade) |
 | AssignmentMaterial | assignment\_id, material\_id, pages (text opțional, de exemplu „12-15, 18”) | cheie primară compusă (assignment\_id, material\_id); materialul trebuie să fie din același curs cu tema, altfel 422; spune studentului unde să învețe pentru întreaga temă |
 | TestCaseMaterial | test\_case\_id, material\_id, pages (text opțional) | cheie primară compusă (test\_case\_id, material\_id); același curs; alimentează popup-ul care apare când testul respectiv e greșit |
 
@@ -208,6 +213,8 @@ Douăsprezece tabele acoperă tot proiectul: un profesor are cursuri, un curs ar
 - `enrollments (course_id)`, pentru lista studenților unui curs
 - materials (course\_id, created\_at DESC), pentru meniul de materiale al cursului
 - assignment\_materials (material\_id) și test\_case\_materials (material\_id), pentru verificarea la ștergere și pentru recomandări
+- material\_pages: GIN pe tsv (căutarea paginilor candidate) și unic pe (material\_id, page\_no) (Pasul 9)
+- generation\_jobs (assignment\_id, created\_at DESC) și (requested\_by, created\_at), pentru jobul activ și limita pe oră (Pasul 9)
 
 Ștergerile sunt definitive, cu `ON DELETE CASCADE` acolo unde copilul nu are sens fără părinte (decizia D15). Excepție: cascade-ul nu șterge fișierele din uploads/, deci MaterialService le șterge explicit când se șterge un material sau un curs.
 
@@ -235,7 +242,7 @@ Toate rutele stau sub `/api/v1`, în afară de `/health`. „Membru” înseamn�
 | `GET /assignments/{id}` | membru | detaliile temei | 1 |
 | `PATCH /assignments/{id}` | profesorul cursului | modifică sau publică tema | 1 |
 | `DELETE /assignments/{id}` | profesorul cursului | șterge tema | 1 |
-| `GET /assignments/{id}/test-cases` | membru | profesor: toate câmpurile; student: doar testele publice | 1 |
+| `GET /assignments/{id}/test-cases` | membru | profesor: toate câmpurile, cu filtrul opțional `review=draft|approved` (Pasul 9); student: doar testele publice și aprobate | 1, 9 |
 | `POST /assignments/{id}/test-cases` | profesorul cursului | adaugă un test cu conceptele lui | 1 |
 | `PATCH /test-cases/{id}` | profesorul cursului | modifică un test | 1 |
 | `DELETE /test-cases/{id}` | profesorul cursului | șterge un test | 1 |
@@ -262,6 +269,12 @@ Toate rutele stau sub `/api/v1`, în afară de `/health`. „Membru” înseamn�
 | GET /assignments/{id}/materials | membru | materialele asociate temei, cu paginile indicate | 8 |
 | PUT /assignments/{id}/materials | profesorul cursului | înlocuiește lista de materiale a temei: \[{material\_id, pages}\]; materiale din alt curs dau 422 | 8 |
 | PUT /test-cases/{id}/materials | profesorul cursului | înlocuiește lista de materiale a unui test: \[{material\_id, pages}\] | 8 |
+| `GET /config` | public | `ai_available` (frontend-ul decide dacă arată butonul de generare) | 9 |
+| `POST /assignments/{id}/generate-tests` | profesorul cursului | pornește generarea (`count` 4-12, implicit 8); 202 cu `{job_id}`; 409 dacă există deja un job activ pe temă; 429 peste `AI_MAX_JOBS_PER_HOUR`; 503 fără AI | 9 |
+| `GET /generation-jobs/{id}` | profesorul cursului | starea jobului, `tests_kept`, eroarea, soluția de referință | 9 |
+| `POST /test-cases/{id}/approve` | profesorul cursului | aprobă o ciornă (`review_status = approved`); 422 fără `expected_output` | 9 |
+| `POST /assignments/{id}/tests/approve-all` | profesorul cursului | aprobă toate ciornele temei | 9 |
+| `POST /materials/{id}/reindex` | profesorul cursului | reextrage textul paginilor materialului | 9 |
 | GET /submissions/{id}/recommendations | autorul sau profesorul cursului | materialele de recapitulat pentru testele picate, calculate la cerere; testele ascunse apar doar ca „Test ascuns #n” | 8 |
 
 **Forma unui răspuns de trimitere**
@@ -352,6 +365,10 @@ Fiecare element din machetele UI (varianta D, cea oficială, descrisă în secț
 | Curs (profesor) | fila „Materiale”: încărcare, redenumire, ștergere | nou GET/POST /courses/{id}/materials, PATCH/DELETE /materials/{id} |
 | Editor temă | selectorul de materiale ale temei, cu pagini | nou GET/PUT /assignments/{id}/materials |
 | Editor temă | selectorul de materiale pe fiecare test | nou PUT /test-cases/{id}/materials |
+| Editor temă (Pasul 9) | butonul „Generate tests with AI”, doar când AI e disponibil | nou `GET /config` (`ai_available`), `POST /assignments/{id}/generate-tests` |
+| Editor temă (Pasul 9) | panoul cu starea generării și soluția de referință, pliată | nou `GET /generation-jobs/{id}` (polling la 2 s) |
+| Editor temă (Pasul 9) | ciornele: Approve, Edit, Delete, Approve all, avertismentul cu ciornele rămase | nou `POST /test-cases/{id}/approve`, `POST /assignments/{id}/tests/approve-all`, `GET /assignments/{id}/test-cases?review=draft`, `PATCH`/`DELETE /test-cases/{id}` |
+| Curs (profesor), fila Materials (Pasul 9) | „No text found, link pages manually” și reindexarea unui material | `materials.text_pages`, nou `POST /materials/{id}/reindex` |
 
 **Endpoint-uri noi (6).** Totalul crește de la 29 la 35.
 
@@ -379,7 +396,7 @@ Fiecare element din machetele UI (varianta D, cea oficială, descrisă în secț
 
 **Unde intră în pași (propunere).** Profilul și cursurile (`PATCH /users/me`, parola, părăsirea cursului, `join-code`, `color`) în pasul de autentificare și cursuri. `hint`, `error_excerpt` și `verdicts` în pașii cu runner-ul și trimiterile asincrone. Statisticile, filtrele și activitatea în pasul cu rapoartele și conceptele. Fiecare are teste API ca restul: permisiuni (student sau profesor, membru sau nu) și forma răspunsului.
 
-Materialele (11 endpoint-uri noi, totalul ajunge la 46). Ecranele din ultimele opt rânduri ale tabelului nu au machetă în canvas: Fable le construiește după descrierea din Pasul 8, în stilul machetelor existente, iar utilizatorul le validează în browser. Detaliile contractului (validări, coduri de eroare, regula de recomandare) sunt în Pasul 8.
+Materialele (11 endpoint-uri noi, totalul ajunge la 46). Pasul 9 adaugă 5 endpoint-uri (totalul ajunge la 51), plus `GET /config` pentru `ai_available`. Ecranele din ultimele opt rânduri ale tabelului nu au machetă în canvas: Fable le construiește după descrierea din Pasul 8, în stilul machetelor existente, iar utilizatorul le validează în browser. Detaliile contractului (validări, coduri de eroare, regula de recomandare) sunt în Pasul 8.
 
 ## Strategia de testare
 
@@ -401,6 +418,7 @@ Testele se scriu în același pas cu funcționalitatea, pe opt niveluri: de la f
 - **Nume și formă:** `test_<ce>_<comportament>`, cu structura aranjare, acțiune, verificare.
 - **Fixture-uri comune** în `conftest.py`: `db_session`, `client`, `make_user`, `make_course`, `teacher_token`, `student_token`. Datele de test se construiesc cu funcții simple, fără bibliotecă de factories.
 - **`FakeRunner`:** un runner determinist, programat să întoarcă verdictele dorite, ca testele de servicii să nu depindă de Docker.
+- **`FakeLLMClient` (Pasul 9):** răspunsuri fixe în locul lui Claude; niciun test nu face apeluri reale și niciun test nu are nevoie de `ANTHROPIC_API_KEY`.
 - **Matricea de permisiuni:** un singur test parametrizat cu liniile (rol, metodă, cale, status așteptat); orice rută nouă adaugă o linie.
 - **Markere:** `docker` pentru testele care cer daemonul Docker, `slow` pentru cele lente. Rularea rapidă: `pytest -m "not docker"`.
 - **Acoperire:** `pytest --cov` pe `services` și `runner`, țintă orientativă 80%. Contează căile de eroare, nu cifra.
@@ -438,6 +456,11 @@ Documentul pornește de la valorile din coloana „Default propus”. Răspunde 
 | D22 | Vizibilitatea materialelor | vizibile imediat studenților înscriși la curs | stare ciornă/publicat, ca la teme |  |
 | D23 | Formatul paginilor indicate | text liber validat, de exemplu „12-15, 18”; linkul deschide prima pagină | o singură pagină; selector vizual de pagini |  |
 | D24 | Limita fișierelor încărcate | 20 MB pe fișier, doar PDF și PPTX | 50 MB; adăugarea altor formate (DOCX) |  |
+| D25 | Modelul pentru generarea testelor (Pasul 9) | Claude prin SDK-ul oficial `anthropic`, model din `AI_MODEL` (implicit `claude-sonnet-5-5`), cheia în `ANTHROPIC_API_KEY`; cheia nu ajunge în frontend sau în git (decis 17.11.2026) | alt furnizor prin `LLMClient` |  |
+| D26 | Sursa lui `expected_output` la testele generate | rularea soluției de referință în sandbox, niciodată răspunsul modelului; ieșiri corecte prin construcție (decis 17.11.2026) | n/a |  |
+| D27 | Căutarea paginilor candidate | full-text search PostgreSQL (`tsvector`, dicționar `simple`); fără tehnologie nouă, suficient pentru câteva sute de pagini (decis 17.11.2026) | embeddings cu pgvector |  |
+| D28 | Testele generate | ciorne până la aprobarea profesorului; evaluarea ignoră ciornele; profesorul răspunde pentru teste (decis 17.11.2026) | aprobare automată |  |
+| D29 | Disponibilitatea AI | funcție opțională: fără cheie, butonul nu apare și endpoint-urile răspund 503; aplicația merge și fără cont Claude (decis 17.11.2026) | AI obligatoriu |  |
 
 ## Pasul 0 · Fundații (săpt. 3)
 
@@ -901,7 +924,86 @@ class Runner(Protocol):
 
 **Întrebări pentru tine:** D20 (PPTX prin LibreOffice) și D21-D24. În plus: popup-ul apare automat la fiecare trimitere cu greșeli (default) sau doar prin butonul „Materiale recomandate” de lângă rezultat? Studentul poate descărca originalul (default: da)? Paginile se scriu ca interval liber (default) sau ai nevoie de un selector vizual?
 
-## Pasul 9 · Calitate, securitate și livrare locală (săpt. 12)
+## Pasul 9 · Teste generate cu Claude, legate automat de materiale (rezervă, după MVP)
+
+Pas adăugat pe 17.11.2026 din documentul „Pasul 9 - Teste generate cu Claude”. Are prioritate față de restul planului unde se contrazic. Începe doar după ce pașii 0-8 sunt gata și testați: MVP-ul rămâne fără această funcție și consumă săptămâna de rezervă. Dacă timpul nu ajunge, se taie în ordinea: (a) legarea automată de materiale, (b) toată funcția; generarea testelor fără legare e deja utilă.
+
+**Obiectiv.** Profesorul scrie doar enunțul temei și apasă „Generate tests with AI”: platforma cere lui Claude o soluție de referință și 6-12 intrări, rulează soluția în sandbox ca să obțină ieșirile așteptate, propune conceptul, ponderea, vizibilitatea și materialul cu paginile fiecărui test, și salvează totul ca ciornă. Profesorul revizuiește și aprobă; doar testele aprobate contează la evaluare și sunt vizibile studenților. Testele scrise manual rămân posibile, exact ca până acum.
+
+**Regula principală.** Modelul nu scrie niciodată `expected_output`. Ieșirea așteptată vine doar din rularea soluției de referință în sandbox (D26): un LLM greșește des ieșirile, iar un test greșit penalizează un student cu cod corect.
+
+**Arhitectură și design**
+
+- `LLMClient` e o interfață, ca `Runner`: `complete_json(system, user, schema) -> dict`. `ClaudeClient` folosește SDK-ul oficial `anthropic` (D25), cu timeout `AI_TIMEOUT_S` și 2 reîncercări cu așteptare exponențială la 429/5xx; `FakeLLMClient` întoarce răspunsuri fixe în teste. Răspunsul se validează cu Pydantic; JSON invalid se mai cere o dată, apoi jobul trece în `error`.
+- Funcția e opțională (D29): `ai_available = AI_ENABLED and ANTHROPIC_API_KEY`. Fără cheie, butonul nu apare și endpoint-urile răspund 503. Cheia nu apare în loguri, în răspunsuri, în teste sau în git.
+- Generarea rulează ca job în fundal, ca trimiterile (Pasul 5): `POST /assignments/{id}/generate-tests` răspunde 202 cu `{job_id}`, iar interfața face polling la 2 s pe `GET /generation-jobs/{id}`. Ca la trimiteri, la pornirea aplicației joburile rămase `queued` sau `running` devin `error`.
+- **Generarea (`AIService.generate_tests`)**:
+  1. Jobul trece în `running`; se încarcă tema (enunț, limite) și conceptele cursului.
+  2. Apelul 1 către Claude primește enunțul (cel mult 8 000 de caractere), limbajul (Python 3.12), limitele, numele conceptelor cursului și numărul de teste dorit. Întoarce JSON `{reference_solution, tests: [{name, input, concepts, hidden, weight, rationale}]}`. Promptul cere cazuri normale, cazuri limită și cel puțin o intrare mare, concepte doar din lista primită și nicio ieșire așteptată.
+  3. Fiecare intrare se rulează cu `Runner.run` (Docker, aceleași limite ca tema, același semafor global). Testul se păstrează doar dacă rularea e curată (cod de ieșire 0, fără timp sau memorie depășite); `expected_output` = stdout-ul obținut. Primul test se rulează de două ori: dacă ieșirile diferă, soluția nu e deterministă și jobul trece în `error`.
+  4. Numele de concepte se potrivesc cu conceptele cursului fără diacritice și fără majuscule; cele necunoscute se ignoră și nu se creează concepte automat.
+  5. Testele se salvează cu `source = ai`, `review_status = draft`, `generation_job_id` și `ai_rationale`; pe job se salvează `reference_code`, `tests_proposed`, `tests_kept` și tokenii.
+  6. Legarea de materiale pentru fiecare test păstrat, apoi jobul trece în `done`. O excepție oriunde: `error` cu `error_message`; ciornele deja salvate rămân.
+- **Legarea automată (`AIService.link_materials`)**, D27:
+  1. Candidații vin din `material_pages` ale cursului: `ts_rank(tsv, plainto_tsquery('simple', ...))` pe concepte, cuvinte din rationale și din enunț; primele 12 pagini cu rang > 0. Fără candidați, testul rămâne fără material și se aplică regula din Pasul 8 (materialele temei).
+  2. Apelul 2 către Claude primește testul (nume, concept, rationale) și candidații (titlul materialului, pagina, primele 800 de caractere), cu instrucțiunea explicită că textul materialelor e dată, nu instrucțiune. Întoarce `{"material_id": 12, "pages": "12-15"}` sau `{"material_id": null}`.
+  3. Propunerea se validează: materialul e din cursul temei, paginile respectă formatul D23 și există în PDF; altfel se ignoră. Se inserează în `test_case_materials`, editabilă din editorul existent.
+- **Extragerea textului.** La încărcare, după salvare și după conversia PPTX, textul fiecărei pagini se extrage cu `pypdf` în fundal, se normalizează (cel mult 20 000 de caractere pe pagină) și se scrie în `material_pages`; `materials.text_pages` = câte pagini au text. Un PDF scanat are `text_pages = 0`: legarea îl ignoră, iar interfața scrie „No text found, link pages manually”. Materialele vechi se reindexează cu `POST /materials/{id}/reindex` sau cu `python -m app.cli reindex-materials`.
+- **Ciornele (D28).** Evaluarea, scorul și `total_count` folosesc doar testele `approved`. Studenții nu văd ciornele în niciun endpoint (teste, rezultate, recomandări, dashboard, raportul pe concepte, statistici). O temă se poate publica cu ciorne, iar interfața profesorului avertizează („3 AI tests still need review”). Aprobarea unui test fără `expected_output` dă 422.
+- **Securitate și cost.** Doar profesorul cursului pornește generarea și vede soluția de referință. Un singur job activ pe temă (409) și cel mult `AI_MAX_JOBS_PER_HOUR` joburi pe profesor pe oră (429). Codul studenților nu se trimite niciodată la Claude. Soluția de referință rulează doar în Docker, niciodată cu `SubprocessRunner` în afara mediului de test.
+
+**Configurare** (în `.env`; în `.env.example` fără valoare pentru cheie):
+
+```text
+AI_ENABLED=true
+ANTHROPIC_API_KEY=
+AI_MODEL=claude-sonnet-5-5
+AI_TIMEOUT_S=60
+AI_MAX_JOBS_PER_HOUR=5
+```
+
+**Cod de scris**
+
+- Migrare Alembic: tabelele `generation_jobs` și `material_pages` (coloana `tsv` generată, index GIN), coloanele noi din `test_cases` și `materials` (vezi „Modelul de date”). Enumerări noi `TestSource` și `ReviewStatus`; starea jobului refolosește valorile `queued`, `running`, `done`, `error`.
+- `app/ai/client.py` (`LLMClient`, `ClaudeClient`, `FakeLLMClient`), `app/ai/prompts.py` (șabloanele și schemele JSON), `app/ai/schemas.py` (`GeneratedTest`, `GenerationResult`, `MaterialChoice`).
+- `app/services/ai_service.py`: `generate_tests(job_id)`, `link_materials(test_case_id)`, `approve(...)`, `approve_all(...)`; `material_service.extract_pages(material)`.
+- `app/api/v1/ai.py` cu rutele noi și `GET /config`; `app/cli.py` cu `reindex-materials`.
+- Evaluarea din `submission_service` și agregările din `dashboard_service` și `report_service` filtrează `review_status = approved`.
+- Dependința `anthropic` în `pyproject.toml`.
+- Frontend, în editorul temei: butonul „Generate tests with AI” (doar dacă `ai_available`, dezactivat cu enunț gol); panoul cu starea jobului („Writing reference solution”, „Running in sandbox”, „Linking materials”, apoi „8 tests ready for review” sau eroarea); ciornele ca carduri (nume, intrare, ieșire așteptată, concept, ascuns, pondere, materialul propus cu link spre vizualizator, `ai_rationale` scris mic) cu Approve, Edit, Delete și, sus, „Approve all” cu numărul de ciorne rămase; soluția de referință într-o secțiune pliată, doar pentru citire; eticheta „AI” pe testele aprobate cu `source = ai`.
+
+**Tehnologii explicate**
+
+- **SDK-ul `anthropic` și răspunsuri JSON validate:** de ce un model de limbaj nu e o sursă de adevăr pentru ieșiri și cum îl îngrădești cu o schemă Pydantic și reîncercări.
+- **Full-text search în PostgreSQL:** `tsvector`, `plainto_tsquery`, `ts_rank`, dicționarul `simple`, coloane generate și indexul GIN; de ce nu embeddings (D27).
+- **Prompt injection:** textul materialelor ajunge în prompt, deci e tratat ca dată, iar propunerile modelului se validează înainte să fie salvate.
+- **Job-uri asincrone cu cost:** limitarea pe oră, un singur job activ pe temă, tokenii salvați pe job.
+
+**Teste** (toate cu `FakeLLMClient`, fără rețea; unde e nevoie, cu `SubprocessRunner` în mediul de test)
+
+- răspuns JSON invalid: o reîncercare, apoi job `error`;
+- `expected_output` vine din rularea soluției, nu din răspuns (un răspuns fals cu ieșiri greșite nu le salvează);
+- o intrare pe care soluția dă eroare sau depășește timpul e eliminată (`tests_kept < tests_proposed`);
+- soluție nedeterministă: job `error`;
+- concept necunoscut ignorat, concept existent mapat corect (inclusiv fără diacritice);
+- pagini propuse inexistente sau material din alt curs: ignorate;
+- ciornele nu apar pentru studenți și nu contează la scor; după aprobare contează;
+- permisiuni: student 403; profesorul altui curs 404 (convenția proiectului pentru resurse din alt curs); fără cheie 503; al doilea job activ 409; peste limita pe oră 429;
+- extragerea paginilor la încărcare și la `reindex`; PDF fără text dă `text_pages = 0`.
+
+**Gata când**
+
+- [ ] profesorul scrie un enunț, apasă butonul și în sub 2 minute vede 6-12 ciorne cu ieșiri corecte (verificat manual pe 3 teme diferite)
+- [ ] cel puțin jumătate din ciorne au material și pagini propuse, pentru un curs cu PDF-uri care au text
+- [ ] după „Approve all”, un student e evaluat doar pe testele aprobate, iar la un test picat popup-ul arată materialul propus de AI
+- [ ] toate testele de mai sus trec în CI, fără apeluri reale la Claude
+- [ ] documentația e actualizată: use case „Generare teste cu AI” (actor secundar Claude API), diagrama de clase (`AIService`, `LLMClient`, `ClaudeClient`, `GenerationJob`, `MaterialPage`), baza de date cu 14 tabele, secvența „generarea testelor”, `docs/api.md`, D25-D29 în `docs/decizii.md`
+
+**Întrebări de verificare:** De ce nu ne bazăm pe ieșirile scrise de model și cum obținem `expected_output`? Ce se întâmplă dacă materialul e un PDF scanat sau dacă modelul propune pagini care nu există? Cum te asiguri că o ciornă greșită nu scade nota unui student?
+
+**Git:** ramura `pas-9/teste-ai`; cheia `ANTHROPIC_API_KEY` nu apare în niciun commit (se verifică `git diff --staged` înainte de fiecare commit).
+
+## Pasul 10 · Calitate, securitate și livrare locală (săpt. 12)
 
 **Obiectiv.** Aplicația e stabilă, rezonabil de sigură pentru un proiect de curs și pornește de la zero după instrucțiunile din README. Niciun flux nou; doar consolidare.
 
@@ -954,7 +1056,7 @@ class Runner(Protocol):
 
 **Întrebări pentru tine:** D10. În plus: demonstrezi pe laptopul tău sau pe un server al facultății (dacă e server, backend-ul nu se expune public)? Vrei și testul Playwright? Ce limită folosim pentru rate limit (10 cereri pe minut la login, default)?
 
-## Pasul 10 · Predare, documentație și demo (săpt. 13)
+## Pasul 11 · Predare, documentație și demo (săpt. 13)
 
 **Obiectiv.** Documentația e completă, demo-ul e repetat, iar proiectul e înghețat: de luni din săptămâna 13 nu mai intră nicio funcționalitate nouă, doar corecturi.
 
@@ -1016,7 +1118,7 @@ class Runner(Protocol):
 
 ### A. Checklist de securitate
 
-Se parcurge la sfârșitul Pasului 4, secțiunea „Fișiere încărcate” la sfârșitul Pasului 8, iar tot checklist-ul din nou în Pasul 9. Fiecare punct are un test sau o verificare asociată în pașii de mai sus.
+Se parcurge la sfârșitul Pasului 4, secțiunea „Fișiere încărcate” la sfârșitul Pasului 8, secțiunea „Generare cu AI” la sfârșitul Pasului 9, iar tot checklist-ul din nou în Pasul 10. Fiecare punct are un test sau o verificare asociată în pașii de mai sus.
 
 **Sandbox**
 
@@ -1058,6 +1160,16 @@ Se parcurge la sfârșitul Pasului 4, secțiunea „Fișiere încărcate” la s
 - [ ] testele ascunse apar în recomandări doar ca „Test ascuns #n”
 - [ ] titlul materialului se afișează ca text, niciodată ca HTML
 
+**Generare cu AI (Pasul 9)**
+
+- [ ] `ANTHROPIC_API_KEY` doar în `.env`, niciodată în git, în loguri, în răspunsuri sau în teste
+- [ ] codul studenților nu se trimite niciodată la Claude; enunțul trimis are cel mult 8 000 de caractere
+- [ ] soluția de referință rulează doar în sandbox-ul Docker, cu limitele temei și semaforul global
+- [ ] `expected_output` vine doar din rularea soluției; propunerile de concepte și pagini se validează înainte de salvare
+- [ ] textul materialelor din prompt e marcat ca dată, nu ca instrucțiune
+- [ ] ciornele nu sunt vizibile studenților și nu contează la scor
+- [ ] un singur job activ pe temă și cel mult `AI_MAX_JOBS_PER_HOUR` joburi pe profesor pe oră
+
 ### B. Șablonul unui pas nou
 
 Când apare o funcționalitate care nu încape în pașii existenți, o descrii cu acest șablon înainte să scrii cod, ca documentul să rămână sursa adevărului.
@@ -1093,6 +1205,6 @@ Se completează pe parcurs; orice idee nouă din timpul implementării ajunge ai
 - worker separat cu coadă de joburi
 - detecția de plagiat între trimiteri
 - teste de tip grilă
-- căutare în textul materialelor
+- căutare în textul materialelor pentru studenți (din Pasul 9 textul paginilor se indexează, dar doar pentru legarea testelor generate)
 - versionarea materialelor și publicare programată
 - alte formate de material (DOCX, video)
