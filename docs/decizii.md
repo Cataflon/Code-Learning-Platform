@@ -114,3 +114,16 @@ Câte un rezumat scurt pe pas: ce s-a construit și de ce. Deciziile mari au și
 - D28: testele generate sunt ciorne până la aprobarea profesorului; evaluarea le ignoră.
 - D29: funcția e opțională: fără cheie, butonul nu apare și endpoint-urile răspund 503.
 - Ajustări față de documentul primit, ca să se potrivească cu codul existent: rutele stau sub `/api/v1`; lista testelor e `GET /assignments/{id}/test-cases` (nu `/tests`); evaluarea e în `submission_service`, nu într-un `GradingService`; profesorul altui curs primește 404, nu 403 (convenția proiectului); dependința se adaugă în `pyproject.toml`; joburile blocate se recuperează la pornire, ca trimiterile. Constrângerea „fără chei API” din context devine „fără chei API obligatorii”.
+
+## Pasul 7 · Concepte și raportul „unde greșești”
+
+- D17: pentru fiecare student și temă contează cea mai recentă trimitere terminată (`done`), aleasă cu `DISTINCT ON (student_id, assignment_id)`. Trimiterile `error`, `queued` sau `running` nu contează, la fel temele nepublicate și studenții care au părăsit cursul.
+- `report_service` e împărțit în două: `fetch_concept_rows` e singura funcție care interoghează baza (lanțul submissions → test_results → test_cases → test_case_concepts → concepts), iar `classify`, `aggregate_concepts` și `aggregate_class` sunt funcții pure, testate pe rânduri scrise de mână.
+- Rata pe concept = teste trecute / teste, fără ponderi; un test cu două concepte contează la amândouă. Nivelurile: sub 50% `review`, de la 50% la sub 80% `progress`, de la 80% `mastered`; pragurile sunt în configurare (`CONCEPT_REVIEW_BELOW`, `CONCEPT_MASTERED_FROM`).
+- Raportul clasei face media ratelor fiecărui student (nu a tuturor testelor la un loc), ca un student cu multe teste să nu cântărească mai mult decât ceilalți, și numără câți studenți sunt la `review` și câți la `mastered`.
+- Testele ascunse apar în raportul studentului doar ca „Hidden test #n”, numerotate pe temă ca în rezultate.
+- Golurile lăsate în Pasul 6 sunt completate: „To review” din dashboard (primele 3 concepte la `review`, din toate cursurile) și „concepts mastered” din profil.
+- Frontend: pagina „Where you go wrong” (`/report`, cu alegerea cursului în adresă, `?course=`) și raportul clasei pentru profesor (`/courses/{id}/report`, o filă nouă lângă Assignments). Graficele Recharts au bare orizontale, cel mai slab concept sus, și un text echivalent pentru cititoare de ecran; nivelul e scris mereu, nu doar colorat.
+- Pe telefon, nivelul trece sub numele conceptului și coloanele secundare se ascund, ca pagina să nu facă scroll orizontal.
+- Cardul „Course summaries and practice questions” din macheta 05 nu există (decizie de dinainte de Pasul 0).
+- `scripts/seed_demo.py` creează cursul „Python Basics (demo)” (cod `DEMOPY26`) cu trei studenți: Ana (bună la recursivitate, slabă la liste), Bogdan (slab aproape peste tot) și Carmen (bună peste tot). Fiecare are și o încercare mai veche, mai slabă, care nu trebuie să conteze.

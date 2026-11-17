@@ -680,6 +680,9 @@ a:hover > .sqs .sq,
 .tabbar {
   display: none;
 }
+.show-sm {
+  display: none;
+}
 
 /* ---------- breadcrumbs and page heads ---------- */
 .crumb {
@@ -1161,6 +1164,12 @@ a.row:hover {
   }
 }
 @media (max-width: 640px) {
+  .hide-sm {
+    display: none;
+  }
+  .show-sm {
+    display: inline-flex;
+  }
   main.page {
     padding-block: 24px 112px;
   }

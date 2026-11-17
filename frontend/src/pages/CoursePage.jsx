@@ -291,6 +291,29 @@ function ConceptsCard({ courseId }) {
   );
 }
 
+/** Sections of a course for its teacher. Materials joins them in Step 8. */
+export function CourseTabs({ courseId, current }) {
+  const tabs = [
+    { key: "assignments", label: "Assignments", to: `/courses/${courseId}` },
+    { key: "report", label: "Concept report", to: `/courses/${courseId}/report` },
+  ];
+  return (
+    <nav className="tabs dash-top" aria-label="Course sections">
+      {tabs.map((tab) => (
+        <Link
+          key={tab.key}
+          to={tab.to}
+          className="tab"
+          aria-selected={tab.key === current}
+          aria-current={tab.key === current ? "page" : undefined}
+        >
+          {tab.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
 /** Teacher view of one course (mockup 10). Tabs: Assignments now, Materials from Step 8. */
 export default function CoursePage() {
   const courseId = Number(useParams().courseId);
@@ -322,15 +345,7 @@ export default function CoursePage() {
           )
         }
       />
-      <div className="mb-9 flex gap-2 border-b border-edge" role="tablist" aria-label="Course sections">
-        <span
-          role="tab"
-          aria-selected="true"
-          className="-mb-px border-b-2 border-accent-strong px-6 py-3 font-semibold text-accent-strong"
-        >
-          Assignments
-        </span>
-      </div>
+      <CourseTabs courseId={courseId} current="assignments" />
       <div className="grid gap-9 lg:grid-cols-[1fr_360px]">
         <div className="min-w-0">
           <AssignmentsCard courseId={courseId} />
