@@ -36,8 +36,10 @@ export default function GlyphTideBackground({
 
   useEffect(() => {
     const cv = ref.current;
-    const cx = cv.getContext("2d");
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // A browser (or a test environment) without canvas or matchMedia simply gets no background.
+    const cx = cv?.getContext?.("2d");
+    if (!cx) return undefined;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     const LH = Math.round(fontSize * 1.25);
     let W = 0, H = 0, CW = 7.2, cols = 0, rows = 0, hmap = null, raf = 0, last = 0;
 
