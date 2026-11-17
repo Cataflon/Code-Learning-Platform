@@ -104,3 +104,13 @@ Câte un rezumat scurt pe pas: ce s-a construit și de ce. Deciziile mari au și
 - Editorul salvează într-un singur pas: întâi detaliile temei, apoi testele (cele noi se creează, cele existente se actualizează, cele scoase din formular se șterg).
 - Ecrane fără machetă, făcute din aceleași componente: „My courses” al profesorului (carduri și formular de curs nou) și fereastra cu codul unei trimiteri, deschisă din linkul „Code”.
 - Diferențe față de machete: câmpul de indiciu apare la orice test, nu doar la cele ascunse (backend-ul îl acceptă pe toate); fiecare test are buton de ștergere; pagina cursului nu are butoane de ștergere pentru curs sau temă, deși rutele există.
+
+## Plan · Pasul 9 nou: teste generate cu Claude (17.11.2026)
+
+- Planul primește un pas nou, Pasul 9 („Teste generate cu Claude, legate automat de materiale”), după Pasul 8. Vechiul Pasul 9 (calitate și livrare) devine Pasul 10, vechiul Pasul 10 (predare) devine Pasul 11. Pasul 9 începe doar după ce pașii 0-8 sunt gata; MVP-ul nu depinde de el.
+- D25: Claude prin SDK-ul oficial `anthropic`, model din `AI_MODEL` (implicit `claude-sonnet-5-5`), cheia în `ANTHROPIC_API_KEY`, niciodată în frontend sau în git.
+- D26: `expected_output` se obține rulând soluția de referință în sandbox, nu din răspunsul modelului.
+- D27: paginile candidate se caută cu full-text search din PostgreSQL (`tsvector`, dicționar `simple`), fără embeddings.
+- D28: testele generate sunt ciorne până la aprobarea profesorului; evaluarea le ignoră.
+- D29: funcția e opțională: fără cheie, butonul nu apare și endpoint-urile răspund 503.
+- Ajustări față de documentul primit, ca să se potrivească cu codul existent: rutele stau sub `/api/v1`; lista testelor e `GET /assignments/{id}/test-cases` (nu `/tests`); evaluarea e în `submission_service`, nu într-un `GradingService`; profesorul altui curs primește 404, nu 403 (convenția proiectului); dependința se adaugă în `pyproject.toml`; joburile blocate se recuperează la pornire, ca trimiterile. Constrângerea „fără chei API” din context devine „fără chei API obligatorii”.
