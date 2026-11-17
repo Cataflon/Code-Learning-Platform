@@ -28,6 +28,7 @@ from app.schemas.dashboard import (
     ActivityDay,
     ActivityTotals,
     AssignmentStats,
+    ConceptToReview,
     CourseStats,
     DashboardAssignment,
     DashboardCourse,
@@ -39,7 +40,7 @@ from app.schemas.dashboard import (
     SubmissionPage,
     TestStat,
 )
-from app.services import submission_service
+from app.services import report_service, submission_service
 
 IN_PROGRESS = (SubmissionStatus.queued, SubmissionStatus.running)
 SCORE_BUCKETS = [("0–25%", 0, 25), ("26–50%", 26, 50), ("51–75%", 51, 75), ("76–99%", 76, 99)]
@@ -133,10 +134,15 @@ def student_dashboard(db: Session, student: User) -> StudentDashboard:
         for submission in submissions[:5]
     ]
     best_scores = [item.best_score for item in items if item.best_score is not None]
+    # Concepts below the review threshold in any course, weakest first (the concept report).
+    to_review = sorted(
+        (c for c in report_service.student_concepts_everywhere(db, student) if c.level == "review"),
+        key=lambda c: (c.pass_rate, c.concept.lower()),
+    )
     stats = DashboardStats(
         to_submit=sum(1 for item in items if item.status == "open" and item.best_score != 100),
         average_best_score=round(sum(best_scores) / len(best_scores)) if best_scores else None,
-        concepts_to_review=0,
+        concepts_to_review=len(to_review),
     )
     return StudentDashboard(
         stats=stats,
@@ -151,7 +157,15 @@ def student_dashboard(db: Session, student: User) -> StudentDashboard:
         ],
         assignments=items,
         recent_submissions=recent,
-        concepts_to_review=[],  # filled in by the concept report (Step 7)
+        concepts_to_review=[
+            ConceptToReview(
+                concept=concept.concept,
+                passed=concept.passed,
+                total=concept.total,
+                verdicts=[test.verdict for test in concept.tests],
+            )
+            for concept in to_review[:3]
+        ],
     )
 
 
@@ -409,5 +423,13 @@ def user_activity(db: Session, user: User, weeks: int = 14, today: date | None =
     return Activity(
         weeks=weeks,
         days=[ActivityDay(date=row.day, count=row.count) for row in rows],
-        totals=ActivityTotals(submissions=total, solved=solved, concepts_mastered=0),
+        totals=ActivityTotals(
+            submissions=total,
+            solved=solved,
+            concepts_mastered=sum(
+                1
+                for concept in report_service.student_concepts_everywhere(db, user)
+                if concept.level == "mastered"
+            ),
+        ),
     )

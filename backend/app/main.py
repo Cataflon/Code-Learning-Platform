@@ -14,6 +14,7 @@ from app.api.v1 import (
     courses,
     dashboard,
     health,
+    reports,
     submissions,
     test_cases,
     users,
@@ -37,6 +38,7 @@ def build_api_router() -> APIRouter:
     api.include_router(test_cases.router)
     api.include_router(submissions.router)
     api.include_router(dashboard.router)
+    api.include_router(reports.router)
     return api
 
 
