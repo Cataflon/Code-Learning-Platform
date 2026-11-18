@@ -13,7 +13,7 @@ function job(overrides) {
     assignment_id: 3,
     status: "running",
     phase: "writing",
-    model: "qwen/qwen3-next-80b-a3b-instruct",
+    model: "nvidia/nemotron-3-ultra-550b-a55b",
     tests_requested: 8,
     tests_proposed: null,
     tests_kept: null,

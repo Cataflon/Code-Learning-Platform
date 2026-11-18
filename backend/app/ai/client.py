@@ -120,7 +120,7 @@ def parse_json_object(text: str) -> dict[str, Any]:
 
 
 class NvidiaClient:
-    """A model of the NVIDIA API catalog (default ``qwen/qwen3-next-80b-a3b-instruct``).
+    """A model of the NVIDIA API catalog (default ``nvidia/nemotron-3-ultra-550b-a55b``).
 
     The hosted endpoint is OpenAI-compatible, so the official ``openai`` SDK is used with
     NVIDIA's base URL. Its documented request has no JSON-schema field, so the schema goes
@@ -129,7 +129,7 @@ class NvidiaClient:
     409, 429, 5xx and connection errors twice with exponential backoff.
     """
 
-    MAX_TOKENS = 4096
+    MAX_TOKENS = 8192  # reasoning models spend part of it thinking before the JSON
 
     def __init__(self, api_key: str, model: str, base_url: str, timeout_s: float) -> None:
         self.model = model

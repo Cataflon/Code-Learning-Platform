@@ -57,7 +57,7 @@ model și apeși „Get API Key”.
 ```bash
 AI_PROVIDER=nvidia
 NVIDIA_API_KEY=nvapi-...        # nu se pune niciodată în git
-AI_MODEL=qwen/qwen3-next-80b-a3b-instruct
+AI_MODEL=nvidia/nemotron-3-ultra-550b-a55b
 ```
 
 Cu Claude: `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY=...` și `AI_MODEL=claude-sonnet-5-5`.

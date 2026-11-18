@@ -457,7 +457,7 @@ Documentul pornește de la valorile din coloana „Default propus”. Răspunde 
 | D22 | Vizibilitatea materialelor | vizibile imediat studenților înscriși la curs | stare ciornă/publicat, ca la teme |  |
 | D23 | Formatul paginilor indicate | text liber validat, de exemplu „12-15, 18”; linkul deschide prima pagină | o singură pagină; selector vizual de pagini |  |
 | D24 | Limita fișierelor încărcate | 20 MB pe fișier, doar PDF și PPTX | 50 MB; adăugarea altor formate (DOCX) |  |
-| D25 | Modelul pentru generarea testelor (Pasul 9) | implicit catalogul NVIDIA (cheie gratuită), prin endpoint-ul compatibil OpenAI și SDK-ul `openai`: `AI_PROVIDER=nvidia`, `NVIDIA_API_KEY`, `AI_MODEL=qwen/qwen3-next-80b-a3b-instruct`; Claude rămâne opțiune (`AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`); cheia nu ajunge în frontend sau în git (decis 17.11.2026, revizuit 18.11.2026) | alt furnizor prin `LLMClient` |  |
+| D25 | Modelul pentru generarea testelor (Pasul 9) | implicit catalogul NVIDIA (cheie gratuită), prin endpoint-ul compatibil OpenAI și SDK-ul `openai`: `AI_PROVIDER=nvidia`, `NVIDIA_API_KEY`, `AI_MODEL=nvidia/nemotron-3-ultra-550b-a55b`; Claude rămâne opțiune (`AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`); cheia nu ajunge în frontend sau în git (decis 17.11.2026, revizuit 18.11.2026) | alt furnizor prin `LLMClient` |  |
 | D26 | Sursa lui `expected_output` la testele generate | soluția de referință o scrie profesorul și rulează în sandbox pe fiecare intrare; modelul propune doar intrările, nu scrie cod și nu scrie ieșiri (decis 17.11.2026, revizuit 18.11.2026) | n/a |  |
 | D27 | Căutarea paginilor candidate | full-text search PostgreSQL (`tsvector`, dicționar `simple`); fără tehnologie nouă, suficient pentru câteva sute de pagini (decis 17.11.2026) | embeddings cu pgvector |  |
 | D28 | Testele generate | ciorne până la aprobarea profesorului; evaluarea ignoră ciornele; profesorul răspunde pentru teste (decis 17.11.2026) | aprobare automată |  |
@@ -961,8 +961,8 @@ AI_PROVIDER=nvidia            # sau anthropic
 NVIDIA_API_KEY=              # gratuită: build.nvidia.com, Get API Key
 ANTHROPIC_API_KEY=
 AI_BASE_URL=https://integrate.api.nvidia.com/v1
-AI_MODEL=qwen/qwen3-next-80b-a3b-instruct   # cu Claude: claude-sonnet-5-5
-AI_TIMEOUT_S=60
+AI_MODEL=nvidia/nemotron-3-ultra-550b-a55b   # cu Claude: claude-sonnet-5-5
+AI_TIMEOUT_S=120
 AI_MAX_JOBS_PER_HOUR=5
 ```
 

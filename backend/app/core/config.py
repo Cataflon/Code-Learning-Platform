@@ -52,9 +52,9 @@ class Settings(BaseSettings):
     nvidia_api_key: SecretStr = SecretStr("")  # never logged, never returned
     anthropic_api_key: SecretStr = SecretStr("")
     ai_base_url: str = "https://integrate.api.nvidia.com/v1"
-    ai_model: str = "qwen/qwen3-next-80b-a3b-instruct"
+    ai_model: str = "nvidia/nemotron-3-ultra-550b-a55b"
     ai_effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"  # Claude only
-    ai_timeout_s: int = 60
+    ai_timeout_s: int = 120
     ai_max_jobs_per_hour: int = 5
 
     @property

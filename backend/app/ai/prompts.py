@@ -22,7 +22,9 @@ each of your inputs to obtain them.
 
 Rules for the tests:
 - Cover normal cases, edge cases (empty, zero, one element, negative numbers, boundaries) and
-  at least one large input that stays within the stated limits.
+  at least one larger input that stays within the stated limits.
+- You write every input out literally, so keep each one under 2000 characters: a "larger"
+  input means big values or a list of tens to a couple of hundred items, never thousands.
 - Each test has a short, specific name, an input exactly as the reference solution reads it
   from stdin (same format, with a trailing newline), and a one-sentence rationale saying what
   the test checks.
