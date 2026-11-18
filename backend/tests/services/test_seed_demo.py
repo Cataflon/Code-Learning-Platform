@@ -32,3 +32,25 @@ def test_seed_demo_gives_three_different_profiles_and_is_idempotent(db_session):
     assert set(carmen.values()) == {"mastered"}  # the latest attempt is perfect
     assert sum(1 for level in bogdan.values() if level == "review") >= 3
     assert ana != bogdan != carmen
+
+
+def test_seed_materials_links_the_lecture_to_the_hidden_test(
+    db_session, file_store, fake_converter
+):
+    from app.models import Material, TestCaseMaterial
+    from scripts.seed import seed
+    from scripts.seed_demo import LECTURE_TITLE, seed_materials
+
+    seed(db_session)
+
+    notes = seed_materials(db_session, store=file_store, converter=fake_converter)
+    again = seed_materials(db_session, store=file_store, converter=fake_converter)
+
+    lecture = db_session.scalar(select(Material).where(Material.title == LECTURE_TITLE))
+    assert lecture.page_count == 28
+    assert len(notes) == 2 and again == []
+    link = db_session.scalar(
+        select(TestCaseMaterial).where(TestCaseMaterial.material_id == lecture.id)
+    )
+    assert link.pages == "12-15"
+    assert file_store.path(lecture.stored_filename).read_bytes().startswith(b"%PDF-")

@@ -35,7 +35,10 @@ from app.models import (
 from app.runner.factory import get_runner
 from app.services.course_service import generate_join_code
 from app.services.scoring import compute_score, count_passed
+from app.storage.file_store import FileStore, get_file_store
+from app.storage.pptx_converter import ConversionError, get_converter
 from tests.fakes import FakeRunner
+from tests.files import pdf_bytes
 
 TEST_DATABASE = "autograder_test"
 
@@ -103,7 +106,9 @@ def background_session_factory(db_session: Session) -> Callable[[], Session]:
 
 
 @pytest.fixture
-def client(db_session: Session, background_session_factory) -> Iterator[TestClient]:
+def client(
+    db_session: Session, background_session_factory, file_store, fake_converter
+) -> Iterator[TestClient]:
     app = create_app()
 
     def request_session() -> Iterator[Session]:
@@ -115,8 +120,65 @@ def client(db_session: Session, background_session_factory) -> Iterator[TestClie
     app.dependency_overrides[get_background_session_factory] = lambda: background_session_factory
     # Never the real sandbox by accident: a test that submits code sets its own runner.
     app.dependency_overrides[get_runner] = lambda: FakeRunner([])
+    # Uploads go to a temporary folder; PPTX "conversion" is faked unless a test says otherwise.
+    app.dependency_overrides[get_file_store] = lambda: file_store
+    app.dependency_overrides[get_converter] = lambda: fake_converter
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def file_store(tmp_path) -> FileStore:
+    return FileStore(tmp_path / "uploads")
+
+
+class FakeConverter:
+    """Writes a PDF with ``pages`` pages instead of calling LibreOffice; can be told to fail."""
+
+    def __init__(self, pages: int = 4) -> None:
+        self.pages = pages
+        self.fail = False
+        self.calls = 0
+
+    def __call__(self, src, dst_dir):
+        self.calls += 1
+        if self.fail:
+            raise ConversionError("LibreOffice could not convert the file")
+        target = dst_dir / f"{src.stem}.pdf"
+        target.write_bytes(pdf_bytes(self.pages))
+        return target
+
+
+@pytest.fixture
+def fake_converter() -> FakeConverter:
+    return FakeConverter()
+
+
+@pytest.fixture
+def make_material(db_session: Session, file_store: FileStore):
+    """A stored PDF material, as if it had been uploaded."""
+    from app.models import FileType, Material, MaterialCategory
+
+    def _make_material(course, title="Lecture 4", pages=28, category=MaterialCategory.lecture):
+        file_store.root.mkdir(parents=True, exist_ok=True)
+        source = file_store.temp_dir() / "source.pdf"
+        source.write_bytes(pdf_bytes(pages))
+        stored = file_store.save_file(source, "pdf")
+        material = Material(
+            course_id=course.id,
+            title=title,
+            category=category,
+            file_type=FileType.pdf,
+            original_filename=f"{title.lower().replace(' ', '-')}.pdf",
+            stored_filename=stored,
+            size_bytes=1000,
+            page_count=pages,
+        )
+        db_session.add(material)
+        db_session.commit()
+        return material
+
+    return _make_material
 
 
 @pytest.fixture

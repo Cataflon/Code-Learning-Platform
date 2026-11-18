@@ -1,10 +1,13 @@
 """Application settings, read from environment variables and an optional .env file."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal, Self
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
@@ -34,6 +37,13 @@ class Settings(BaseSettings):
     # Concept report levels (Step 7): below the first is "review", from the second "mastered".
     concept_review_below: float = 0.5
     concept_mastered_from: float = 0.8
+
+    # Course materials (Step 8)
+    upload_dir: Path = REPO_ROOT / "uploads"
+    max_upload_mb: int = 20
+    pptx_convert_timeout_s: int = 60
+    # Path to LibreOffice's soffice; empty = look in PATH and in the usual install folders.
+    soffice_path: str = ""
 
     @model_validator(mode="after")
     def _subprocess_runner_only_in_dev(self) -> Self:

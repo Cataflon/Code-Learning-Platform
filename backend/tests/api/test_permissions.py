@@ -22,6 +22,7 @@ ASSIGNMENT = "/assignments/{assignment}"
 DRAFT = "/assignments/{draft}"
 TEST_CASE = "/test-cases/{test_case}"
 SUBMISSION = "/submissions/{submission}"
+MATERIAL = "/materials/{material}"
 
 NEW_COURSE = {"title": "New course"}
 NEW_ASSIGNMENT = {"title": "New assignment"}
@@ -134,11 +135,45 @@ MATRIX = [
     ("member", "GET", COURSE + "/reports/concepts", None, 403),
     ("other_teacher", "GET", COURSE + "/reports/concepts", None, 404),
     ("owner", "GET", COURSE + "/reports/concepts", None, 200),
+    # --- materials, Learn and recommendations
+    ("anonymous", "GET", "/me/learn", None, 401),
+    ("member", "GET", "/me/learn", None, 200),
+    ("owner", "GET", "/me/learn", None, 403),
+    ("member", "GET", COURSE + "/materials", None, 200),
+    ("outsider", "GET", COURSE + "/materials", None, 404),
+    ("other_teacher", "GET", COURSE + "/materials", None, 404),
+    ("member", "GET", MATERIAL, None, 200),
+    ("outsider", "GET", MATERIAL, None, 404),
+    ("member", "GET", MATERIAL + "/file", None, 200),
+    ("outsider", "GET", MATERIAL + "/file", None, 404),
+    ("other_teacher", "GET", MATERIAL + "/file", None, 404),
+    ("anonymous", "GET", MATERIAL + "/preview", None, 401),
+    ("owner", "GET", MATERIAL + "/preview", None, 200),
+    ("outsider", "GET", MATERIAL + "/preview", None, 404),
+    ("member", "PATCH", MATERIAL, {"title": "Hacked"}, 403),
+    ("other_teacher", "PATCH", MATERIAL, {"title": "Hacked"}, 404),
+    ("owner", "PATCH", MATERIAL, {"title": "Renamed"}, 200),
+    ("member", "DELETE", MATERIAL, None, 403),
+    ("other_teacher", "DELETE", MATERIAL, None, 404),
+    ("owner", "DELETE", MATERIAL, None, 204),
+    ("member", "GET", ASSIGNMENT + "/materials", None, 200),
+    ("outsider", "GET", ASSIGNMENT + "/materials", None, 404),
+    ("member", "PUT", ASSIGNMENT + "/materials", [], 403),
+    ("other_teacher", "PUT", ASSIGNMENT + "/materials", [], 404),
+    ("owner", "PUT", ASSIGNMENT + "/materials", [], 200),
+    ("member", "PUT", TEST_CASE + "/materials", [], 403),
+    ("other_teacher", "PUT", TEST_CASE + "/materials", [], 404),
+    ("owner", "PUT", TEST_CASE + "/materials", [], 200),
+    ("anonymous", "GET", SUBMISSION + "/recommendations", None, 401),
+    ("member", "GET", SUBMISSION + "/recommendations", None, 200),
+    ("owner", "GET", SUBMISSION + "/recommendations", None, 200),
+    ("classmate", "GET", SUBMISSION + "/recommendations", None, 404),
+    ("other_teacher", "GET", SUBMISSION + "/recommendations", None, 404),
 ]
 
 
 @pytest.fixture
-def world(db_session, make_user, make_course, make_assignment, make_test_case):
+def world(db_session, make_user, make_course, make_assignment, make_test_case, make_material):
     """One course with every kind of actor around it."""
     owner, other_teacher = make_user(Role.teacher), make_user(Role.teacher)
     member, outsider = make_user(Role.student), make_user(Role.student)
@@ -165,6 +200,7 @@ def world(db_session, make_user, make_course, make_assignment, make_test_case):
             "draft": draft.id,
             "test_case": test_case.id,
             "submission": submission.id,
+            "material": make_material(course).id,
         },
     }
 
