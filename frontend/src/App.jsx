@@ -5,10 +5,12 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, homePathFor, useAuth } from "./auth/AuthContext.jsx";
 import ProtectedRoute from "./auth/ProtectedRoute.jsx";
 import AppLayout from "./components/AppLayout.jsx";
+import { LoadingState } from "./components/states.jsx";
 import AssignmentPage from "./pages/AssignmentPage.jsx";
 import CoursesPage from "./pages/CoursesPage.jsx";
 import CoursePage from "./pages/CoursePage.jsx";
 import Learn from "./pages/Learn.jsx";
+import LandingPage from "./pages/LandingPage.jsx";
 import LearnCourse from "./pages/LearnCourse.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import MaterialViewer from "./pages/MaterialViewer.jsx";
@@ -31,20 +33,22 @@ function ByRole({ student, teacher }) {
   return user.role === "teacher" ? teacher : student;
 }
 
-function RootRedirect() {
-  const { user } = useAuth();
-  return <Navigate to={user ? homePathFor(user) : "/login"} replace />;
+/** "/": the landing page for visitors, the home page of their role for signed-in users. */
+function Home() {
+  const { user, status } = useAuth();
+  if (status === "loading") return <LoadingState label="Signing you in…" />;
+  return user ? <Navigate to={homePathFor(user)} replace /> : <LandingPage />;
 }
 
 export function AppRoutes() {
   return (
     <Routes>
+      <Route path="/" element={<Home />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/status" element={<StatusPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<RootRedirect />} />
           <Route
             path="/courses"
             element={<ByRole student={<CoursesPage />} teacher={<TeacherCoursesPage />} />}
