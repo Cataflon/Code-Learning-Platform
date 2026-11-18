@@ -1,9 +1,9 @@
-"""Tests generated with Claude and linked automatically to course materials (Step 9).
+"""Tests generated with AI and linked automatically to course materials (Step 9).
 
-The main rule (decision D26): the model never writes an expected output. It writes a
-reference solution and test inputs; the solution runs in the sandbox on every input, and
-what it prints becomes ``expected_output``. Every generated test starts as a draft (D28)
-and counts only after the teacher approves it.
+The main rule (decision D26): the model writes no code and no expected output. The
+teacher gives the reference solution, the model proposes test inputs, the solution runs in
+the sandbox on every input, and what it prints becomes ``expected_output``. Every generated
+test starts as a draft (D28) and counts only after the teacher approves it.
 """
 
 import logging
@@ -64,11 +64,13 @@ def ensure_available() -> None:
 
 
 def start_generation(
-    db: Session, assignment: Assignment, teacher: User, count: int
+    db: Session, assignment: Assignment, teacher: User, count: int, reference_solution: str
 ) -> GenerationJob:
     ensure_available()
     if not assignment.description.strip():
         raise InvalidDataError("Write the task statement before generating tests")
+    if not reference_solution.strip():
+        raise InvalidDataError("Paste your reference solution: it computes the expected outputs")
     active = db.scalar(
         select(GenerationJob.id).where(
             GenerationJob.assignment_id == assignment.id, GenerationJob.status.in_(ACTIVE)
@@ -95,6 +97,7 @@ def start_generation(
         requested_by=teacher.id,
         model=get_settings().ai_model,
         tests_requested=count,
+        reference_code=reference_solution,
         created_at=datetime.now(UTC),
     )
     db.add(job)
@@ -115,7 +118,7 @@ def phase_of(job: GenerationJob) -> str:
     if job.status != SubmissionStatus.running:
         return job.status.value
     if job.tests_proposed is None:
-        return "writing"  # waiting for Claude's reference solution
+        return "writing"  # waiting for the model to propose test inputs
     if job.tests_kept is None:
         return "sandbox"  # running the reference solution
     return "linking"  # choosing materials
@@ -180,7 +183,7 @@ def _ask[T: BaseModel](
             result = llm.complete_json(system, user, schema)
         except InvalidJSONError:
             if attempt == 2:
-                raise GenerationError("Claude did not return a valid answer twice") from None
+                raise GenerationError("The model did not return a valid answer twice") from None
             continue
         job.input_tokens += result.input_tokens
         job.output_tokens += result.output_tokens
@@ -188,7 +191,7 @@ def _ask[T: BaseModel](
             return model.model_validate(result.data)
         except ValidationError:
             if attempt == 2:
-                raise GenerationError("Claude did not return a valid answer twice") from None
+                raise GenerationError("The model did not return a valid answer twice") from None
     raise AssertionError("unreachable")
 
 
@@ -210,13 +213,14 @@ def generate_tests(
     concepts = list(db.scalars(select(Concept).where(Concept.course_id == assignment.course_id)))
     by_name = {normalize_name(concept.name): concept for concept in concepts}
 
-    # 1. Claude writes a reference solution and the test inputs (never the outputs).
+    # 1. The model proposes test inputs for the teacher's solution (no code, no outputs).
     result = _ask(
         llm,
         job,
         prompts.GENERATION_SYSTEM,
         prompts.generation_prompt(
             assignment.description,
+            job.reference_code,
             assignment.time_limit_ms,
             assignment.memory_limit_mb,
             [concept.name for concept in concepts],
@@ -225,7 +229,6 @@ def generate_tests(
         prompts.GENERATION_SCHEMA,
         GenerationResult,
     )
-    job.reference_code = result.reference_solution
     job.tests_proposed = len(result.tests)
     db.commit()
 
@@ -236,9 +239,9 @@ def generate_tests(
     kept: list[tuple[int, str]] = []
     with slots:
         for index, test in enumerate(result.tests):
-            run = runner.run(result.reference_solution, test.input, limits)
+            run = runner.run(job.reference_code, test.input, limits)
             if index == 0:
-                again = runner.run(result.reference_solution, test.input, limits)
+                again = runner.run(job.reference_code, test.input, limits)
                 if again.stdout != run.stdout:
                     raise GenerationError(
                         "The reference solution is not deterministic: two runs on the same "
@@ -340,7 +343,7 @@ def find_candidates(db: Session, course_id: int, terms: list[str]) -> list[dict]
 
 
 def link_materials(db: Session, job: GenerationJob, test_case: TestCase, llm: LLMClient) -> bool:
-    """Ask Claude which candidate page explains the test; keep the answer only if it checks out."""
+    """Ask the model which candidate page explains the test; keep it only if it checks out."""
     assignment = test_case.assignment
     concepts = [concept.name for concept in test_case.concepts]
     terms = search_terms(

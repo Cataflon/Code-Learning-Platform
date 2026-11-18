@@ -42,9 +42,8 @@ def digit_sum_runner(**special):
     return FakeRunner(run)
 
 
-def answer(*tests, solution=SOLUTION):
+def answer(*tests):
     return {
-        "reference_solution": solution,
         "tests": [
             {
                 "name": name,
@@ -63,7 +62,7 @@ def answer(*tests, solution=SOLUTION):
 
 @pytest.fixture(autouse=True)
 def ai_key(monkeypatch):
-    monkeypatch.setattr(get_settings(), "anthropic_api_key", SecretStr("test-key"))
+    monkeypatch.setattr(get_settings(), "nvidia_api_key", SecretStr("test-key"))
 
 
 @pytest.fixture
@@ -86,7 +85,7 @@ def setup(make_user, make_course, make_assignment, make_concept, make_test_case)
 
 
 def run_job(db, setup, llm, runner, count=8):
-    job = ai_service.start_generation(db, setup["assignment"], setup["teacher"], count)
+    job = ai_service.start_generation(db, setup["assignment"], setup["teacher"], count, SOLUTION)
     session = db
 
     def factory():
@@ -169,7 +168,7 @@ def test_an_invalid_answer_is_asked_for_once_more(db_session, setup):
 
 
 def test_two_invalid_answers_end_the_job_in_error(db_session, setup):
-    llm = FakeLLMClient([InvalidJSONError("bad"), {"reference_solution": ""}])
+    llm = FakeLLMClient([InvalidJSONError("bad"), {"tests": "not a list"}])
 
     job = run_job(db_session, setup, llm, digit_sum_runner())
 
@@ -197,7 +196,9 @@ def test_the_prompt_lists_the_course_concepts_and_the_statement(db_session, setu
     assert "Do NOT write expected outputs" in system
     assert "Write 6 tests" in user and "Cazuri limită" in user
     assert "<task_statement>" in user and "sum of its digits" in user
+    assert "<reference_solution>" in user and SOLUTION.strip() in user
     assert "expected_output" not in str(schema)
+    assert "reference_solution" not in str(schema)  # the model writes no code (D26)
 
 
 def test_drafts_do_not_count_until_they_are_approved(db_session, setup):
@@ -231,28 +232,34 @@ def test_rules_for_starting_a_job(db_session, setup, monkeypatch):
     )
 
     assignment, teacher = setup["assignment"], setup["teacher"]
-    first = ai_service.start_generation(db_session, assignment, teacher, 8)
+    first = ai_service.start_generation(db_session, assignment, teacher, 8, SOLUTION)
     with pytest.raises(ConflictError):  # one active job per assignment
-        ai_service.start_generation(db_session, assignment, teacher, 8)
+        ai_service.start_generation(db_session, assignment, teacher, 8, SOLUTION)
 
     first.status = SubmissionStatus.done
     db_session.commit()
     monkeypatch.setattr(get_settings(), "ai_max_jobs_per_hour", 1)
     with pytest.raises(TooManyRequestsError):
-        ai_service.start_generation(db_session, assignment, teacher, 8)
+        ai_service.start_generation(db_session, assignment, teacher, 8, SOLUTION)
 
     assignment.description = "   "
     monkeypatch.setattr(get_settings(), "ai_max_jobs_per_hour", 5)
     with pytest.raises(InvalidDataError):
-        ai_service.start_generation(db_session, assignment, teacher, 8)
+        ai_service.start_generation(db_session, assignment, teacher, 8, SOLUTION)
 
-    monkeypatch.setattr(get_settings(), "anthropic_api_key", SecretStr(""))
+    assignment.description = "Print the digit sum."
+    with pytest.raises(InvalidDataError, match="reference solution"):
+        ai_service.start_generation(db_session, assignment, teacher, 8, "  	 ")
+
+    monkeypatch.setattr(get_settings(), "nvidia_api_key", SecretStr(""))
     with pytest.raises(ServiceUnavailableError):
-        ai_service.start_generation(db_session, assignment, teacher, 8)
+        ai_service.start_generation(db_session, assignment, teacher, 8, SOLUTION)
 
 
 def test_stuck_jobs_are_marked_as_error_at_startup(db_session, setup):
-    job = ai_service.start_generation(db_session, setup["assignment"], setup["teacher"], 8)
+    job = ai_service.start_generation(
+        db_session, setup["assignment"], setup["teacher"], 8, SOLUTION
+    )
     job.status = SubmissionStatus.running
     db_session.commit()
 
@@ -324,7 +331,7 @@ def test_full_text_search_finds_the_right_pages(db_session, setup, file_store):
     assert 2 not in {candidate["page_no"] for candidate in found}
 
 
-def test_generated_tests_are_linked_to_the_page_claude_picks(db_session, setup, file_store):
+def test_generated_tests_are_linked_to_the_page_the_model_picks(db_session, setup, file_store):
     material = lecture_pdf(db_session, file_store, setup["course"], LECTURE_PAGES)
     material_service.extract_pages(db_session, material, file_store)
     llm = FakeLLMClient(

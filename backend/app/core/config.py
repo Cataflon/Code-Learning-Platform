@@ -46,16 +46,25 @@ class Settings(BaseSettings):
     soffice_path: str = ""
 
     # AI test generation (Step 9, decisions D25-D29). Optional: without a key it is off.
+    # Default provider: the NVIDIA API catalog (OpenAI-compatible); Claude stays an option.
     ai_enabled: bool = True
-    anthropic_api_key: SecretStr = SecretStr("")  # never logged, never returned
-    ai_model: str = "claude-sonnet-5-5"
-    ai_effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
+    ai_provider: Literal["nvidia", "anthropic"] = "nvidia"
+    nvidia_api_key: SecretStr = SecretStr("")  # never logged, never returned
+    anthropic_api_key: SecretStr = SecretStr("")
+    ai_base_url: str = "https://integrate.api.nvidia.com/v1"
+    ai_model: str = "meta/llama-3.3-70b-instruct"
+    ai_effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"  # Claude only
     ai_timeout_s: int = 60
     ai_max_jobs_per_hour: int = 5
 
     @property
+    def ai_api_key(self) -> SecretStr:
+        """The key of the selected provider."""
+        return self.nvidia_api_key if self.ai_provider == "nvidia" else self.anthropic_api_key
+
+    @property
     def ai_available(self) -> bool:
-        return self.ai_enabled and bool(self.anthropic_api_key.get_secret_value().strip())
+        return self.ai_enabled and bool(self.ai_api_key.get_secret_value().strip())
 
     @model_validator(mode="after")
     def _subprocess_runner_only_in_dev(self) -> Self:

@@ -1,10 +1,14 @@
 import { apiFetch } from "./client.js";
 
-/** { ai_available } - whether the server has an Anthropic API key configured. */
+/** { ai_available } - whether the server has a key for its AI provider (NVIDIA or Anthropic). */
 export const getConfig = () => apiFetch("/config");
 
-export const generateTests = (assignmentId, count) =>
-  apiFetch(`/assignments/${assignmentId}/generate-tests`, { method: "POST", body: { count } });
+/** The teacher's reference solution produces the expected outputs; the model only proposes inputs. */
+export const generateTests = (assignmentId, count, referenceSolution) =>
+  apiFetch(`/assignments/${assignmentId}/generate-tests`, {
+    method: "POST",
+    body: { count, reference_solution: referenceSolution },
+  });
 
 export const getGenerationJob = (jobId) => apiFetch(`/generation-jobs/${jobId}`);
 

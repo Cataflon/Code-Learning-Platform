@@ -9,6 +9,7 @@ from tests.fakes import FakeRunner, ok
 
 API = "/api/v1"
 SOLUTION = "print(sum(int(d) for d in input() if d.isdigit()))"
+BODY = {"reference_solution": SOLUTION}
 
 
 def digit_sum(code, stdin, limits):
@@ -17,7 +18,6 @@ def digit_sum(code, stdin, limits):
 
 def scripted_answer():
     return {
-        "reference_solution": SOLUTION,
         "tests": [
             {
                 "name": "Simple",
@@ -41,7 +41,7 @@ def scripted_answer():
 
 @pytest.fixture
 def with_key(monkeypatch):
-    monkeypatch.setattr(get_settings(), "anthropic_api_key", SecretStr("test-key"))
+    monkeypatch.setattr(get_settings(), "nvidia_api_key", SecretStr("test-key"))
 
 
 @pytest.fixture
@@ -58,10 +58,10 @@ def setup(client, make_user, make_course, make_assignment, make_concept, make_te
 
 
 def test_config_says_whether_ai_is_available(client, monkeypatch):
-    monkeypatch.setattr(get_settings(), "anthropic_api_key", SecretStr(""))
+    monkeypatch.setattr(get_settings(), "nvidia_api_key", SecretStr(""))
     assert client.get(f"{API}/config").json() == {"ai_available": False}
 
-    monkeypatch.setattr(get_settings(), "anthropic_api_key", SecretStr("key"))
+    monkeypatch.setattr(get_settings(), "nvidia_api_key", SecretStr("key"))
     assert client.get(f"{API}/config").json() == {"ai_available": True}
 
     monkeypatch.setattr(get_settings(), "ai_enabled", False)
@@ -73,7 +73,9 @@ def test_generation_end_to_end_then_approve(client, auth, setup, with_key):
     headers = auth(teacher)
 
     started = client.post(
-        f"{API}/assignments/{assignment.id}/generate-tests", json={"count": 6}, headers=headers
+        f"{API}/assignments/{assignment.id}/generate-tests",
+        json={"count": 6, "reference_solution": SOLUTION},
+        headers=headers,
     )
     assert started.status_code == 202
     job = client.get(f"{API}/generation-jobs/{started.json()['job_id']}", headers=headers).json()
@@ -115,10 +117,10 @@ def test_generation_end_to_end_then_approve(client, auth, setup, with_key):
 
 def test_without_a_key_generation_answers_503(client, auth, setup, monkeypatch):
     teacher, _, _, assignment, llm = setup
-    monkeypatch.setattr(get_settings(), "anthropic_api_key", SecretStr(""))
+    monkeypatch.setattr(get_settings(), "nvidia_api_key", SecretStr(""))
 
     response = client.post(
-        f"{API}/assignments/{assignment.id}/generate-tests", headers=auth(teacher)
+        f"{API}/assignments/{assignment.id}/generate-tests", json=BODY, headers=auth(teacher)
     )
 
     assert response.status_code == 503
@@ -132,7 +134,7 @@ def test_count_must_be_between_4_and_12(client, auth, setup, with_key):
     for count in (3, 13):
         response = client.post(
             f"{API}/assignments/{assignment.id}/generate-tests",
-            json={"count": count},
+            json={"count": count, "reference_solution": SOLUTION},
             headers=auth(teacher),
         )
         assert response.status_code == 422
@@ -145,25 +147,25 @@ def test_other_teachers_and_students_cannot_start_or_read_jobs(
     other = make_user(Role.teacher)
     url = f"{API}/assignments/{assignment.id}/generate-tests"
 
-    assert client.post(url, headers=auth(student)).status_code == 403
-    assert client.post(url, headers=auth(other)).status_code == 404
-    job_id = client.post(url, headers=auth(teacher)).json()["job_id"]
+    assert client.post(url, json=BODY, headers=auth(student)).status_code == 403
+    assert client.post(url, json=BODY, headers=auth(other)).status_code == 404
+    job_id = client.post(url, json=BODY, headers=auth(teacher)).json()["job_id"]
     assert client.get(f"{API}/generation-jobs/{job_id}", headers=auth(other)).status_code == 404
     assert client.get(f"{API}/generation-jobs/999999", headers=auth(teacher)).status_code == 404
 
 
 def test_the_api_key_never_appears_in_answers(client, auth, setup, monkeypatch):
     teacher, _, _, assignment, _ = setup
-    monkeypatch.setattr(get_settings(), "anthropic_api_key", SecretStr("sk-ant-secret-value"))
+    monkeypatch.setattr(get_settings(), "nvidia_api_key", SecretStr("nvapi-secret-value"))
 
     started = client.post(
-        f"{API}/assignments/{assignment.id}/generate-tests", headers=auth(teacher)
+        f"{API}/assignments/{assignment.id}/generate-tests", json=BODY, headers=auth(teacher)
     )
     job = client.get(f"{API}/generation-jobs/{started.json()['job_id']}", headers=auth(teacher))
     config = client.get(f"{API}/config")
 
     for response in (started, job, config):
-        assert "sk-ant-secret-value" not in response.text
+        assert "nvapi-secret-value" not in response.text
 
 
 def test_reindex_returns_the_number_of_text_pages(client, auth, setup, make_material):
@@ -174,3 +176,15 @@ def test_reindex_returns_the_number_of_text_pages(client, auth, setup, make_mate
 
     assert response.status_code == 200
     assert response.json()["text_pages"] == 0  # blank pages: nothing to search
+
+
+def test_the_reference_solution_is_required(client, auth, setup, with_key):
+    teacher, _, _, assignment, llm = setup
+    url = f"{API}/assignments/{assignment.id}/generate-tests"
+
+    for body in ({"count": 8}, {"count": 8, "reference_solution": ""}, None):
+        assert client.post(url, json=body, headers=auth(teacher)).status_code == 422
+    blank = client.post(url, json={"reference_solution": "   "}, headers=auth(teacher))
+    assert blank.status_code == 422
+    assert "reference solution" in blank.json()["detail"]
+    assert llm.calls == []

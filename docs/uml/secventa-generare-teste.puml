@@ -1,5 +1,5 @@
 @startuml secventa-generare-teste
-title 7e. Generarea testelor cu Claude (Pasul 9)
+title 7e. Generarea testelor cu AI (Pasul 9)
 autonumber
 
 actor Profesor as T
@@ -7,15 +7,15 @@ participant "Browser\n(AssignmentEditor)" as B
 participant "Router\n/api/v1/ai" as R
 participant "AIService" as S
 database "PostgreSQL" as DB
-participant "LLMClient\n(ClaudeClient)" as L
-participant "Claude API" as C
+participant "LLMClient\n(NvidiaClient)" as L
+participant "API-ul modelului\n(NVIDIA / Claude)" as C
 participant "Runner\n(DockerRunner)" as D
 
-T -> B : Generate tests with AI (count)
-B -> R : POST /assignments/{id}/generate-tests
+T -> B : soluția de referință + Generate tests with AI (count)
+B -> R : POST /assignments/{id}/generate-tests\n{reference_solution, count}
 R -> S : start_generation()
-S -> DB : verifică: un singur job activ, limita pe oră, enunț
-S -> DB : INSERT generation_jobs (queued)
+S -> DB : verifică: un singur job activ, limita pe oră, enunț, soluție
+S -> DB : INSERT generation_jobs (queued, reference_code)
 R --> B : 202 {job_id}
 R ->> S : run_generation(job_id) în fundal, sesiune proprie
 
@@ -25,13 +25,13 @@ loop polling la 2 s
 end
 
 S -> DB : status = running
-S -> L : complete_json(enunț, limite, concepte)
-L -> C : messages (structured output, fallbacks)
-C --> L : reference_solution + intrări (fără ieșiri)
+S -> L : complete_json(enunț, soluția profesorului, limite, concepte)
+L -> C : chat completions (schema în mesajul de sistem)
+C --> L : doar intrări (fără cod, fără ieșiri)
 L --> S : JSON validat cu Pydantic
 
 loop pentru fiecare intrare
-  S -> D : run(reference_solution, input, limite)
+  S -> D : run(reference_code, input, limite)
   D --> S : stdout / eroare / timeout
   note right of S : expected_output = stdout\n(niciodată textul modelului)
 end
@@ -41,7 +41,7 @@ S -> DB : INSERT test_cases (source=ai, review_status=draft)
 loop pentru fiecare test păstrat
   S -> DB : ts_rank pe material_pages (tsvector)
   S -> L : complete_json(test + pagini candidate)
-  L -> C : messages
+  L -> C : chat completions
   C --> L : {material_id, pages}
   S -> S : validează cursul și paginile
   S -> DB : INSERT test_case_materials

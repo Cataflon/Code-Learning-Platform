@@ -42,8 +42,8 @@ Teacher --> UC14
 Teacher --> UC15
 Teacher --> UC16
 
-actor "Claude API" as Claude
-UC15 --> Claude
+actor "API-ul modelului\n(NVIDIA / Claude)" as LLM
+UC15 --> LLM
 UC15 ..> UC11 : <<extend>>
 UC15 ..> UC20 : <<include>>
 

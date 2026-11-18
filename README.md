@@ -45,13 +45,19 @@ PDF-urile funcționează normal, iar un PPTX este refuzat cu un mesaj clar.
 
 ## Teste generate cu AI (opțional)
 
-Profesorul poate genera testele unei teme cu Claude. Funcția apare doar dacă `backend/.env`
-conține o cheie API Anthropic:
+Profesorul scrie enunțul, lipește soluția lui de referință și cere modelului intrări pentru
+teste. Modelul nu scrie cod și nu scrie ieșiri: soluția profesorului rulează în sandbox-ul
+Docker pe fiecare intrare, iar ce afișează devine ieșirea așteptată. Testele generate sunt
+ciorne până când profesorul le aprobă.
+
+Funcția apare doar dacă `backend/.env` conține o cheie. Implicit se folosește catalogul NVIDIA,
+cu o cheie gratuită: pe [build.nvidia.com](https://build.nvidia.com) te autentifici, deschizi un
+model și apeși „Get API Key”.
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-...   # nu se pune niciodată în git
-AI_MODEL=claude-sonnet-5-5
+AI_PROVIDER=nvidia
+NVIDIA_API_KEY=nvapi-...        # nu se pune niciodată în git
+AI_MODEL=meta/llama-3.3-70b-instruct
 ```
 
-Ieșirile așteptate nu vin de la model: soluția lui de referință rulează în sandbox-ul Docker.
-Testele generate sunt ciorne până când profesorul le aprobă.
+Cu Claude: `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY=...` și `AI_MODEL=claude-sonnet-5-5`.

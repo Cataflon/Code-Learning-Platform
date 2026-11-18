@@ -108,8 +108,8 @@ Câte un rezumat scurt pe pas: ce s-a construit și de ce. Deciziile mari au și
 ## Plan · Pasul 9 nou: teste generate cu Claude (17.11.2026)
 
 - Planul primește un pas nou, Pasul 9 („Teste generate cu Claude, legate automat de materiale”), după Pasul 8. Vechiul Pasul 9 (calitate și livrare) devine Pasul 10, vechiul Pasul 10 (predare) devine Pasul 11. Pasul 9 începe doar după ce pașii 0-8 sunt gata; MVP-ul nu depinde de el.
-- D25: Claude prin SDK-ul oficial `anthropic`, model din `AI_MODEL` (implicit `claude-sonnet-5-5`), cheia în `ANTHROPIC_API_KEY`, niciodată în frontend sau în git.
-- D26: `expected_output` se obține rulând soluția de referință în sandbox, nu din răspunsul modelului.
+- D25: Claude prin SDK-ul oficial `anthropic`, model din `AI_MODEL` (implicit `claude-sonnet-5-5`), cheia în `ANTHROPIC_API_KEY`, niciodată în frontend sau în git. Revizuit pe 18.11.2026 (vezi „Pasul 9 · revizuire”).
+- D26: `expected_output` se obține rulând soluția de referință în sandbox, nu din răspunsul modelului. Revizuit pe 18.11.2026: soluția e a profesorului.
 - D27: paginile candidate se caută cu full-text search din PostgreSQL (`tsvector`, dicționar `simple`), fără embeddings.
 - D28: testele generate sunt ciorne până la aprobarea profesorului; evaluarea le ignoră.
 - D29: funcția e opțională: fără cheie, butonul nu apare și endpoint-urile răspund 503.
@@ -156,6 +156,14 @@ Câte un rezumat scurt pe pas: ce s-a construit și de ce. Deciziile mari au și
 - Textul paginilor se extrage în fundal după fiecare încărcare; pentru fișierele mai vechi există `POST /materials/{id}/reindex` și `python -m app.cli reindex-materials`. Un PDF fără text (scanat) are `text_pages = 0`, iar fila Materials scrie „No text found, link pages manually”.
 - Faza jobului („Writing reference solution”, „Running in sandbox”, „Linking materials”) se deduce din câmpurile deja completate (`tests_proposed`, `tests_kept`), fără o coloană nouă. Câmp adăugat: `tests_requested`, ca jobul din fundal să știe câte teste s-au cerut.
 - Securitate și cost: un singur job activ pe temă (409), cel mult `AI_MAX_JOBS_PER_HOUR` pe profesor (429), enunțul trimis e tăiat la 8 000 de caractere, codul studenților nu se trimite niciodată. Cheia stă doar în `.env`, ca `SecretStr`, și nu apare în răspunsuri (verificat de un test). Tokenii se salvează pe job și se văd lângă soluția de referință.
-- Fără `ANTHROPIC_API_KEY`, `GET /config` spune `ai_available: false`, butonul nu apare, iar rutele de generare răspund 503 (D29).
-- Model implicit: `claude-sonnet-5-5`, cum cere D25; se schimbă din `AI_MODEL`.
-- Diagrame: cazul de utilizare „Generare teste cu AI” (cu actorul secundar Claude API) și secvența 7e în `docs/uml/secventa-generare-teste.puml`. Diagramele de clase și ER se desenează în Pasul 11, odată cu restul.
+- Fără cheia furnizorului ales (`NVIDIA_API_KEY` sau, cu `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`), `GET /config` spune `ai_available: false`, butonul nu apare, iar rutele de generare răspund 503 (D29).
+- Model implicit la prima versiune: `claude-sonnet-5-5`; după revizuire, `meta/llama-3.3-70b-instruct` prin NVIDIA. Se schimbă din `AI_MODEL`.
+- Diagrame: cazul de utilizare „Generare teste cu AI” (cu actorul secundar API-ul modelului) și secvența 7e în `docs/uml/secventa-generare-teste.puml`. Diagramele de clase și ER se desenează în Pasul 11, odată cu restul.
+
+## Pasul 9 · revizuire (18.11.2026): soluția profesorului, catalogul NVIDIA
+
+- D26 revizuit: modelul nu mai scrie cod. Profesorul lipește soluția lui de referință în editor, lângă buton; `POST /assignments/{id}/generate-tests` o primește în `reference_solution` (obligatorie, 422 dacă lipsește sau e goală) și o salvează pe job în `reference_code`. Modelul primește enunțul și soluția și întoarce doar `{tests: [...]}` (intrări, concepte, ascuns, pondere, motiv). Restul regulilor rămân: soluția rulează în sandbox pe fiecare intrare, intrările pe care pică se elimină, primul test rulează de două ori.
+- Motivul: platforma e gândită ca elevul să scrie cod, iar AI-ul doar să ajute la teste. O soluție scrisă de model poate fi greșită, iar ieșirile ei ar deveni teste greșite; soluția profesorului e sursa de adevăr.
+- D25 revizuit: furnizorul implicit e catalogul NVIDIA (build.nvidia.com), care dă o cheie gratuită pentru dezvoltare. Endpoint-ul e compatibil OpenAI, deci `NvidiaClient` folosește SDK-ul oficial `openai` cu `AI_BASE_URL=https://integrate.api.nvidia.com/v1`. Model implicit: `meta/llama-3.3-70b-instruct` (urmează bine instrucțiunile și răspunde în JSON; nu mai trebuie să scrie cod). Claude rămâne disponibil cu `AI_PROVIDER=anthropic` și `ANTHROPIC_API_KEY`; ambele chei sunt `SecretStr` și nu apar în răspunsuri, loguri sau git.
+- Endpoint-ul NVIDIA nu are câmp pentru o schemă JSON, așa că schema intră în mesajul de sistem, răspunsul se curăță (bloc ```json sau text în jur) și se validează cu Pydantic; un răspuns invalid sau tăiat se mai cere o dată, apoi jobul trece în `error`. Temperatura e 0.2, ca intrările să fie stabile.
+- Faza „Writing reference solution” devine „Proposing test inputs”.

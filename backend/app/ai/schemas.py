@@ -23,7 +23,8 @@ class GeneratedTest(BaseModel):
 
 
 class GenerationResult(BaseModel):
-    reference_solution: str = Field(min_length=1, max_length=64 * 1024)
+    """Only test inputs: the reference solution is the teacher's (decision D26)."""
+
     tests: list[GeneratedTest] = Field(min_length=1, max_length=20)
 
 

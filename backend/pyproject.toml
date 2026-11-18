@@ -17,7 +17,8 @@ dependencies = [
     "python-multipart>=0.0.9",
     "docker>=7.1",
     "pypdf>=4.3",
-    "anthropic>=1.0",  # optional AI test generation (Step 9)
+    "anthropic>=1.0",  # optional AI test generation with Claude (Step 9)
+    "openai>=1.40",  # optional AI test generation through the NVIDIA API catalog (Step 9)
 ]
 
 [project.optional-dependencies]

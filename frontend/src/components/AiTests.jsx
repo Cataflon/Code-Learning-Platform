@@ -16,7 +16,7 @@ export const POLL_MS = 2000;
 
 const PHASES = {
   queued: "Waiting to start",
-  writing: "Writing reference solution",
+  writing: "Proposing test inputs",
   sandbox: "Running in sandbox",
   linking: "Linking materials",
 };
@@ -41,10 +41,11 @@ export function useGenerationJob(jobId, interval = POLL_MS) {
 /** "Generate tests with AI" and the panel that follows the job. */
 export function AiGeneratePanel({ assignmentId, hasStatement, onFinished, interval = POLL_MS }) {
   const [count, setCount] = useState(8);
+  const [solution, setSolution] = useState("");
   const [jobId, setJobId] = useState(null);
   const [finishedId, setFinishedId] = useState(null);
   const start = useMutation({
-    mutationFn: () => aiApi.generateTests(assignmentId, count),
+    mutationFn: () => aiApi.generateTests(assignmentId, count, solution),
     onSuccess: (created) => setJobId(created.job_id),
   });
   const job = useGenerationJob(jobId, interval);
@@ -78,18 +79,29 @@ export function AiGeneratePanel({ assignmentId, hasStatement, onFinished, interv
           </label>
           <Button
             variant="primary"
-            disabled={!hasStatement || running || start.isPending}
+            disabled={!hasStatement || !solution.trim() || running || start.isPending}
             onClick={() => start.mutate()}
           >
             {running ? "Generating…" : "Generate tests with AI"}
           </Button>
         </div>
         <p className="plain text-sm text-ink-3">
-          Claude writes a reference solution and test inputs from the saved task statement; the
-          expected outputs come from running that solution in the sandbox. New tests arrive as drafts
-          and count only after you approve them.
+          The model reads the saved task statement and your reference solution and proposes test inputs;
+          it writes no code. Your solution runs on every input in the sandbox and its output becomes the
+          expected output. New tests arrive as drafts and count only after you approve them.
           {!hasStatement && " Save a task statement first."}
         </p>
+        <label className="label">
+          Your reference solution
+          <textarea
+            className="field mono mt-1 min-h-32"
+            value={solution}
+            onChange={(event) => setSolution(event.target.value)}
+            disabled={running}
+            spellCheck={false}
+            placeholder={"n = abs(int(input()))\nprint(sum(int(d) for d in str(n)))"}
+          />
+        </label>
         <FormError>{start.isError ? start.error.message : ""}</FormError>
         {jobId != null && job.data && (
           <div role="status" aria-live="polite" className="grid gap-2">
@@ -105,7 +117,7 @@ export function AiGeneratePanel({ assignmentId, hasStatement, onFinished, interv
               <p className="text-ok">
                 {plural(job.data.tests_kept ?? 0, "test")} ready for review
                 {job.data.tests_proposed > job.data.tests_kept &&
-                  ` (${job.data.tests_proposed - job.data.tests_kept} dropped: the solution failed on them)`}
+                  ` (${job.data.tests_proposed - job.data.tests_kept} dropped: your solution failed on them)`}
                 .
               </p>
             )}
@@ -256,7 +268,7 @@ function ReferenceSolution({ jobId }) {
   return (
     <details className="dash-top px-6 py-4">
       <summary className="cursor-pointer text-sm text-accent-strong">
-        Reference solution (read only) · {job.data.model} · {job.data.input_tokens + job.data.output_tokens} tokens
+        Reference solution used · {job.data.model} · {job.data.input_tokens + job.data.output_tokens} tokens
       </summary>
       <pre className="io mt-3 max-h-80 overflow-auto p-4 font-mono text-sm">{job.data.reference_code}</pre>
     </details>

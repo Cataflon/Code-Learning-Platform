@@ -40,7 +40,7 @@ class ReviewStatus(enum.StrEnum):
 
 
 class GenerationJob(Base):
-    """One request to generate tests with Claude for an assignment (Step 9).
+    """One request to generate tests with AI for an assignment (Step 9).
 
     The status reuses the submission lifecycle: queued -> running -> done | error.
     ``tests_proposed`` stays empty until the model answered and ``tests_kept`` until the

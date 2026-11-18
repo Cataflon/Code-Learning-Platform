@@ -23,6 +23,7 @@ class ConfigRead(BaseModel):
 
 
 class GenerateTestsRequest(BaseModel):
+    reference_solution: str = Field(min_length=1, max_length=64 * 1024)  # the teacher's
     count: int = Field(default=8, ge=4, le=12)
 
 
@@ -42,7 +43,7 @@ class GenerationJobRead(BaseModel):
     input_tokens: int
     output_tokens: int
     error_message: str | None
-    reference_code: str | None  # only ever sent to the course teacher
+    reference_code: str | None  # the teacher's solution, only sent back to them
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
@@ -76,11 +77,13 @@ def generate_tests(
     llm: Annotated[LLMClient, Depends(get_llm_client)],
     runner: Annotated[Runner, Depends(get_runner)],
     session_factory: Annotated[sessionmaker[Session], Depends(get_background_session_factory)],
-    data: GenerateTestsRequest | None = None,
+    data: GenerateTestsRequest,
 ):
-    """Starts a job and answers 202 at once; poll GET /generation-jobs/{id} for progress."""
-    count = (data or GenerateTestsRequest()).count
-    job = ai_service.start_generation(db, assignment, user, count)
+    """Starts a job and answers 202 at once; poll GET /generation-jobs/{id} for progress.
+
+    The teacher sends the reference solution; the model only proposes the test inputs.
+    """
+    job = ai_service.start_generation(db, assignment, user, data.count, data.reference_solution)
     background.add_task(
         ai_service.run_generation, job.id, session_factory, llm, runner, get_run_slots()
     )
