@@ -41,16 +41,19 @@ export function testPayload(row, position) {
  * Rows without an id are created, rows with an id are updated, and tests that were on the
  * server but are no longer in the form are deleted.
  */
-export async function saveAssignment(assignmentId, details, tests, originalIds, extra = {}) {
-  await assignmentsApi.updateAssignment(assignmentId, {
+function detailsPayload(details) {
+  return {
     title: details.title.trim(),
     description: details.description,
     due_at: fromLocalInput(details.due_at),
     time_limit_ms: Math.round(Number(details.seconds) * 1000),
     memory_limit_mb: Number(details.memory_limit_mb),
     max_submissions: Number(details.max_submissions),
-    ...extra,
-  });
+  };
+}
+
+export async function saveAssignment(assignmentId, details, tests, originalIds, extra = {}) {
+  await assignmentsApi.updateAssignment(assignmentId, { ...detailsPayload(details), ...extra });
   const keptIds = new Set(tests.filter((row) => row.id != null).map((row) => row.id));
   for (const id of originalIds) {
     if (!keptIds.has(id)) await assignmentsApi.deleteTestCase(id);
@@ -69,7 +72,7 @@ function validate(details, tests) {
   return "";
 }
 
-function EditorForm({ assignment, initialTests, concepts, onSaved, onCreateConcept, aiPanel, draftCount }) {
+function EditorForm({ assignment, initialTests, concepts, onSaved, onDetailsSaved, onCreateConcept, aiPanel, draftCount }) {
   const [details, setDetails] = useState(() => detailsOf(assignment));
   const [tests, setTests] = useState(() => initialTests.map(toRow));
   const [state, setState] = useState({ busy: false, error: "", saved: false });
@@ -89,6 +92,14 @@ function EditorForm({ assignment, initialTests, concepts, onSaved, onCreateConce
     } catch (err) {
       setState({ busy: false, error: err.message, saved: false });
     }
+  }
+
+  // Before an AI generation: save only the details (the statement and the limits the server
+  // reads). The tests are left alone, so the form keeps its rows and nothing is remounted.
+  async function saveDetailsForAi() {
+    if (!details.title.trim()) throw new Error("The assignment needs a title.");
+    await assignmentsApi.updateAssignment(assignment.id, detailsPayload(details));
+    await onDetailsSaved?.();
   }
 
   return (
@@ -156,7 +167,7 @@ function EditorForm({ assignment, initialTests, concepts, onSaved, onCreateConce
         </Card>
         <div className="min-w-0">
           <div className="stack">
-            {aiPanel}
+            {aiPanel?.({ statement: details.description, beforeGenerate: saveDetailsForAi })}
             <TestCaseForm tests={tests} onChange={setTests} concepts={concepts} onCreateConcept={onCreateConcept} />
           </div>
         </div>
@@ -229,20 +240,22 @@ export default function AssignmentEditor() {
         initialTests={approved}
         concepts={concepts.data ?? []}
         onSaved={handleSaved}
+        onDetailsSaved={() => assignment.refetch()}
         onCreateConcept={handleCreateConcept}
         draftCount={drafts.length}
-        aiPanel={
+        aiPanel={({ statement, beforeGenerate }) => (
           <>
             {aiConfig.data?.ai_available && (
               <AiGeneratePanel
                 assignmentId={assignmentId}
-                hasStatement={assignment.data.description.trim() !== ""}
+                hasStatement={statement.trim() !== ""}
+                beforeGenerate={beforeGenerate}
                 onFinished={reloadTests}
               />
             )}
             <DraftsPanel assignmentId={assignmentId} drafts={drafts} onChanged={reloadTests} />
           </>
-        }
+        )}
       />
     </>
   );
