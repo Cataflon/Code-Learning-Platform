@@ -2,8 +2,8 @@
 
 ``LLMClient`` is the only thing the service knows. Two real implementations:
 
-* ``NvidiaClient`` (default): a model of the NVIDIA API catalog through its OpenAI-compatible
-  endpoint, with the official ``openai`` SDK pointed at ``AI_BASE_URL``;
+* ``OpenAICompatibleClient``: Gemini (default) or the NVIDIA API catalog, through their
+  OpenAI-compatible endpoints, with the official ``openai`` SDK;
 * ``ClaudeClient``: Claude through the official ``anthropic`` SDK.
 
 ``FakeLLMClient`` answers from a script, so no test ever reaches the network or needs a key.
@@ -11,6 +11,7 @@
 
 import json
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -119,57 +120,99 @@ def parse_json_object(text: str) -> dict[str, Any]:
     return data
 
 
-class NvidiaClient:
-    """A model of the NVIDIA API catalog (default ``qwen/qwen3-next-80b-a3b-instruct``).
+class OpenAICompatibleClient:
+    """A model behind an OpenAI-compatible endpoint: Gemini (default) or the NVIDIA catalog.
 
-    The hosted endpoint is OpenAI-compatible, so the official ``openai`` SDK is used with
-    NVIDIA's base URL. Its documented request has no JSON-schema field, so the schema goes
-    into the system message and the answer is parsed and validated here (and by the caller,
-    which asks once more when it is invalid). Timeout ``AI_TIMEOUT_S``; the SDK retries 408,
-    409, 429, 5xx and connection errors twice with exponential backoff.
+    * The official ``openai`` SDK is pointed at the provider's base URL.
+    * ``structured=True`` (Gemini) asks for the answer constrained to the JSON schema
+      (``response_format``); otherwise (NVIDIA, whose endpoint has no such field) the schema
+      goes into the system message. Either way the answer is parsed and validated here, and the
+      caller asks once more when it is invalid.
+    * Free tiers are often busy: a 503, a 429, a timeout or a lost connection moves on to the
+      next model of ``models`` after a short pause, up to ``MAX_ATTEMPTS`` tries in all.
     """
 
-    MAX_TOKENS = 4096
+    MAX_TOKENS = 8192  # reasoning models spend part of it thinking before the JSON
+    MAX_ATTEMPTS = 6
 
-    def __init__(self, api_key: str, model: str, base_url: str, timeout_s: float) -> None:
-        self.model = model
+    def __init__(
+        self,
+        api_key: str,
+        models: list[str],
+        base_url: str,
+        timeout_s: float,
+        *,
+        label: str,
+        structured: bool,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        self.models = list(models)
+        self.model = self.models[0]
+        self.label = label
+        self.structured = structured
+        self.sleep = sleep
         self.client = openai.OpenAI(
-            api_key=api_key, base_url=base_url, timeout=timeout_s, max_retries=2
+            api_key=api_key, base_url=base_url, timeout=timeout_s, max_retries=0
         )
 
     def complete_json(self, system: str, user: str, schema: dict[str, Any]) -> LLMResult:
-        instructions = (
-            f"{system}\n\nAnswer with ONE JSON object and nothing else (no prose, no code "
-            f"fence). It must follow this JSON Schema:\n{json.dumps(schema)}"
-        )
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": instructions},
-                    {"role": "user", "content": user},
-                ],
-                temperature=0.2,
-                max_tokens=self.MAX_TOKENS,
+        extra: dict[str, Any] = {}
+        if self.structured:
+            instructions = f"{system}\n\nAnswer with one JSON object that follows the schema."
+            extra["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {"name": "answer", "schema": schema},
+            }
+        else:
+            instructions = (
+                f"{system}\n\nAnswer with ONE JSON object and nothing else (no prose, no code "
+                f"fence). It must follow this JSON Schema:\n{json.dumps(schema)}"
             )
-        except openai.AuthenticationError as exc:
-            raise LLMError("The NVIDIA API key was rejected") from exc
-        except openai.RateLimitError as exc:
-            raise LLMError("The model is rate limited right now; try again later") from exc
-        except openai.APIStatusError as exc:
-            raise LLMError(f"The model returned an error ({exc.status_code})") from exc
-        except openai.APIConnectionError as exc:  # includes timeouts
-            raise LLMError("Could not reach the model (network error or timeout)") from exc
+        messages = [
+            {"role": "system", "content": instructions},
+            {"role": "user", "content": user},
+        ]
+        tried: list[str] = []
+        for attempt in range(self.MAX_ATTEMPTS):
+            model = self.models[attempt % len(self.models)]
+            tried.append(model)
+            try:
+                response = self.client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=0.2,
+                    max_tokens=self.MAX_TOKENS,
+                    **extra,
+                )
+            except (openai.AuthenticationError, openai.PermissionDeniedError) as exc:
+                raise LLMError(f"The {self.label} API key was rejected") from exc
+            except (
+                openai.RateLimitError,
+                openai.InternalServerError,
+                openai.APIConnectionError,  # includes timeouts
+            ):
+                self.sleep(min(2**attempt, 8))
+                continue
+            except openai.NotFoundError as exc:
+                if len(self.models) > 1:
+                    continue  # this model was retired; the next one may still exist
+                raise LLMError(f"{self.label} does not offer the model {model}") from exc
+            except openai.APIStatusError as exc:
+                raise LLMError(f"{self.label} returned an error ({exc.status_code})") from exc
 
-        choice = response.choices[0]
-        if choice.finish_reason == "length":
-            raise InvalidJSONError("The answer was cut off before it was complete")
-        usage = response.usage
-        return LLMResult(
-            data=parse_json_object(choice.message.content or ""),
-            input_tokens=usage.prompt_tokens if usage else 0,
-            output_tokens=usage.completion_tokens if usage else 0,
-            model=response.model or self.model,
+            choice = response.choices[0]
+            if choice.finish_reason == "length":
+                raise InvalidJSONError("The answer was cut off before it was complete")
+            usage = response.usage
+            return LLMResult(
+                data=parse_json_object(choice.message.content or ""),
+                input_tokens=usage.prompt_tokens if usage else 0,
+                output_tokens=usage.completion_tokens if usage else 0,
+                model=(response.model or model).removeprefix("models/"),
+            )
+        names = ", ".join(dict.fromkeys(tried))
+        raise LLMError(
+            f"{self.label} is busy right now ({names} did not answer); try again in a few minutes"
         )
 
 
@@ -207,15 +250,17 @@ def build_llm_client() -> LLMClient:
     if settings.ai_provider == "anthropic":
         return ClaudeClient(
             api_key=key,
-            model=settings.ai_model,
-            timeout_s=settings.ai_timeout_s,
+            model=settings.ai_models[0],
+            timeout_s=settings.ai_attempt_timeout_s,
             effort=settings.ai_effort,
         )
-    return NvidiaClient(
+    return OpenAICompatibleClient(
         api_key=key,
-        model=settings.ai_model,
-        base_url=settings.ai_base_url,
-        timeout_s=settings.ai_timeout_s,
+        models=settings.ai_models,
+        base_url=settings.ai_endpoint,
+        timeout_s=settings.ai_attempt_timeout_s,
+        label="Gemini" if settings.ai_provider == "gemini" else "The NVIDIA API",
+        structured=settings.ai_provider == "gemini",
     )
 
 

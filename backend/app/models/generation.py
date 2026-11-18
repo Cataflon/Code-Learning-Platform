@@ -62,6 +62,12 @@ class GenerationJob(Base):
         Enum(SubmissionStatus, native_enum=False, length=16), default=SubmissionStatus.queued
     )
     reference_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # "teacher" when the teacher pasted the solution, "ai" when the model wrote it (D26).
+    reference_by: Mapped[str] = mapped_column(
+        String(16), default="teacher", server_default="teacher"
+    )
+    # The model's second, independent solution, run on every input to cross-check the first.
+    check_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     model: Mapped[str] = mapped_column(String(64))
     tests_requested: Mapped[int] = mapped_column(Integer, default=8)
     tests_proposed: Mapped[int | None] = mapped_column(Integer, nullable=True)

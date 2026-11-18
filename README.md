@@ -45,19 +45,21 @@ PDF-urile funcționează normal, iar un PPTX este refuzat cu un mesaj clar.
 
 ## Teste generate cu AI (opțional)
 
-Profesorul scrie enunțul, lipește soluția lui de referință și cere modelului intrări pentru
-teste. Modelul nu scrie cod și nu scrie ieșiri: soluția profesorului rulează în sandbox-ul
-Docker pe fiecare intrare, iar ce afișează devine ieșirea așteptată. Testele generate sunt
-ciorne până când profesorul le aprobă.
+Profesorul scrie titlul și enunțul și apasă „Generate tests with AI”. Modelul scrie soluția de
+referință și intrările testelor, iar într-o cerere separată o a doua soluție, independentă.
+Ieșirile așteptate nu vin de la model: soluția rulează în sandbox-ul Docker pe fiecare intrare.
+Soluția trebuie să treacă exemplul din enunț, iar testele la care cele două soluții dau
+rezultate diferite sunt marcate „solutions disagree”. Dacă profesorul lipește propria soluție,
+modelul propune doar intrările. Testele generate sunt ciorne până când profesorul le aprobă.
 
-Funcția apare doar dacă `backend/.env` conține o cheie. Implicit se folosește catalogul NVIDIA,
-cu o cheie gratuită: pe [build.nvidia.com](https://build.nvidia.com) te autentifici, deschizi un
-model și apeși „Get API Key”.
+Funcția apare doar dacă `backend/.env` conține o cheie. Implicit se folosește Gemini, cu o cheie
+gratuită de pe [aistudio.google.com](https://aistudio.google.com) („Get API key”):
 
 ```bash
-AI_PROVIDER=nvidia
-NVIDIA_API_KEY=nvapi-...        # nu se pune niciodată în git
-AI_MODEL=qwen/qwen3-next-80b-a3b-instruct
+AI_PROVIDER=gemini
+GEMINI_API_KEY=...              # nu se pune niciodată în git
 ```
 
-Cu Claude: `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY=...` și `AI_MODEL=claude-sonnet-5-5`.
+Modelul implicit e `gemini-3.5-flash`; când e aglomerat (503), se trece automat pe
+`gemini-3.5-flash-lite` și `gemini-3.1-flash-lite`. Alternative: `AI_PROVIDER=nvidia` cu
+`NVIDIA_API_KEY` (catalogul NVIDIA) sau `AI_PROVIDER=anthropic` cu `ANTHROPIC_API_KEY` (Claude).

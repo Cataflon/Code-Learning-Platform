@@ -11,11 +11,13 @@ from app.ai.client import (
     ClaudeClient,
     InvalidJSONError,
     LLMError,
-    NvidiaClient,
+    OpenAICompatibleClient,
     build_llm_client,
     parse_json_object,
 )
 from app.core.config import get_settings
+
+REQUEST = httpx.Request("POST", "http://unused")
 
 
 def test_parse_json_object_tolerates_fences_and_text_around_it():
@@ -31,79 +33,157 @@ def test_parse_json_object_rejects_what_is_not_an_object(text):
 
 
 class ScriptedCompletions:
-    def __init__(self, outcome):
-        self.outcome = outcome
-        self.kwargs = None
+    """Answers (or raises) the outcomes in order and records every request."""
+
+    def __init__(self, *outcomes):
+        self.outcomes = list(outcomes)
+        self.requests = []
 
     def create(self, **kwargs):
-        self.kwargs = kwargs
-        if isinstance(self.outcome, Exception):
-            raise self.outcome
-        return self.outcome
+        self.requests.append(kwargs)
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
 
 
-def completion(content, finish_reason="stop"):
+def completion(content, finish_reason="stop", model="gemini-3.5-flash"):
     return SimpleNamespace(
         choices=[
             SimpleNamespace(finish_reason=finish_reason, message=SimpleNamespace(content=content))
         ],
         usage=SimpleNamespace(prompt_tokens=120, completion_tokens=45),
-        model="qwen/qwen3-next-80b-a3b-instruct",
+        model=model,
     )
 
 
-def nvidia_with(outcome):
-    client = NvidiaClient("test-key", "qwen/qwen3-next-80b-a3b-instruct", "http://unused", 5)
-    completions = ScriptedCompletions(outcome)
+def status_error(cls, code):
+    return cls("error", response=httpx.Response(code, request=REQUEST), body=None)
+
+
+def client_with(*outcomes, structured=False, models=("gemini-3.5-flash",)):
+    pauses = []
+    client = OpenAICompatibleClient(
+        "test-key",
+        list(models),
+        "http://unused",
+        5,
+        label="Gemini",
+        structured=structured,
+        sleep=pauses.append,
+    )
+    completions = ScriptedCompletions(*outcomes)
     client.client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
-    return client, completions
+    return client, completions, pauses
 
 
-def test_nvidia_client_puts_the_schema_in_the_system_message_and_parses_the_answer():
-    client, completions = nvidia_with(completion('```json\n{"tests": [{"name": "x"}]}\n```'))
+def test_without_structured_output_the_schema_goes_into_the_system_message():
+    client, completions, _ = client_with(completion('```json\n{"tests": [{"name": "x"}]}\n```'))
 
     result = client.complete_json("SYSTEM RULES", "the task", {"type": "object"})
 
     assert result.data == {"tests": [{"name": "x"}]}
     assert (result.input_tokens, result.output_tokens) == (120, 45)
-    system, user = completions.kwargs["messages"]
-    assert system["role"] == "system" and "SYSTEM RULES" in system["content"]
-    assert '{"type": "object"}' in system["content"]
+    request = completions.requests[0]
+    system, user = request["messages"]
+    assert "SYSTEM RULES" in system["content"] and '{"type": "object"}' in system["content"]
     assert user == {"role": "user", "content": "the task"}
+    assert "response_format" not in request
 
 
-def test_nvidia_client_treats_a_cut_off_answer_as_invalid_json():
-    client, _ = nvidia_with(completion('{"tests": [', finish_reason="length"))
+def test_with_structured_output_the_schema_constrains_the_answer():
+    client, completions, _ = client_with(completion('{"solution": "print(1)"}'), structured=True)
 
+    client.complete_json("rules", "task", {"type": "object"})
+
+    response_format = completions.requests[0]["response_format"]
+    assert response_format["type"] == "json_schema"
+    assert response_format["json_schema"]["schema"] == {"type": "object"}
+
+
+def test_a_busy_model_moves_on_to_the_next_one():
+    client, completions, pauses = client_with(
+        status_error(openai.InternalServerError, 503),
+        status_error(openai.RateLimitError, 429),
+        openai.APITimeoutError(request=REQUEST),
+        completion('{"ok": true}', model="models/gemini-3.1-flash-lite"),
+        models=("gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"),
+    )
+
+    result = client.complete_json("s", "u", {})
+
+    assert result.data == {"ok": True}
+    assert result.model == "gemini-3.1-flash-lite"
+    assert [request["model"] for request in completions.requests] == [
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash",
+    ]
+    assert pauses == [1, 2, 4]
+
+
+def test_when_every_attempt_is_busy_the_error_says_so():
+    busy = [status_error(openai.InternalServerError, 503) for _ in range(6)]
+    client, completions, _ = client_with(*busy)
+
+    with pytest.raises(LLMError, match="busy right now"):
+        client.complete_json("s", "u", {})
+    assert len(completions.requests) == OpenAICompatibleClient.MAX_ATTEMPTS
+
+
+def test_a_rejected_key_or_a_cut_off_answer_stops_at_once():
+    client, completions, _ = client_with(status_error(openai.AuthenticationError, 401))
+    with pytest.raises(LLMError, match="key was rejected"):
+        client.complete_json("s", "u", {})
+    assert len(completions.requests) == 1
+
+    client, _, _ = client_with(completion('{"tests": [', finish_reason="length"))
     with pytest.raises(InvalidJSONError):
         client.complete_json("s", "u", {})
 
 
-def test_nvidia_client_turns_sdk_errors_into_llm_errors():
-    request = httpx.Request("POST", "http://unused")
-    rejected = openai.AuthenticationError(
-        "bad key", response=httpx.Response(401, request=request), body=None
+def test_a_retired_model_is_skipped_when_there_is_another():
+    client, completions, _ = client_with(
+        status_error(openai.NotFoundError, 404),
+        completion('{"ok": 1}'),
+        models=("gemini-old", "gemini-3.5-flash"),
     )
-    client, _ = nvidia_with(rejected)
 
-    with pytest.raises(LLMError, match="key was rejected"):
-        client.complete_json("s", "u", {})
-
-    client, _ = nvidia_with(openai.APIConnectionError(request=request))
-    with pytest.raises(LLMError, match="Could not reach"):
-        client.complete_json("s", "u", {})
+    assert client.complete_json("s", "u", {}).data == {"ok": 1}
+    assert [request["model"] for request in completions.requests] == [
+        "gemini-old",
+        "gemini-3.5-flash",
+    ]
 
 
-def test_the_provider_setting_picks_the_client_and_its_key(monkeypatch):
+def test_the_provider_setting_picks_the_client_its_key_and_its_models(monkeypatch):
     settings = get_settings()
-    monkeypatch.setattr(settings, "nvidia_api_key", SecretStr("nv-key"))
-    monkeypatch.setattr(settings, "anthropic_api_key", SecretStr(""))
+    monkeypatch.setattr(settings, "gemini_api_key", SecretStr("g-key"))
 
-    assert isinstance(build_llm_client(), NvidiaClient)
+    client = build_llm_client()
+    assert isinstance(client, OpenAICompatibleClient) and client.structured
+    assert settings.ai_models == [
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+    ]
     assert settings.ai_available
+
+    monkeypatch.setattr(settings, "ai_model", "gemini-3.8-flash")
+    assert settings.ai_models == ["gemini-3.8-flash"]  # a chosen model has no default fallbacks
+    monkeypatch.setattr(settings, "ai_fallback_models", "gemini-3.5-flash-lite, gemini-3.8-flash")
+    assert settings.ai_models == ["gemini-3.8-flash", "gemini-3.5-flash-lite"]
+
+    monkeypatch.setattr(settings, "ai_provider", "nvidia")
+    assert not settings.ai_available  # the NVIDIA key is empty
+    monkeypatch.setattr(settings, "nvidia_api_key", SecretStr("nv-key"))
+    nvidia = build_llm_client()
+    assert isinstance(nvidia, OpenAICompatibleClient) and not nvidia.structured
 
     monkeypatch.setattr(settings, "ai_provider", "anthropic")
-    assert not settings.ai_available  # the Anthropic key is empty
+    monkeypatch.setattr(settings, "ai_model", "")
+    monkeypatch.setattr(settings, "ai_fallback_models", "")
     monkeypatch.setattr(settings, "anthropic_api_key", SecretStr("ant-key"))
     assert isinstance(build_llm_client(), ClaudeClient)
-    assert settings.ai_available
+    assert settings.ai_models == ["claude-sonnet-5-5"]

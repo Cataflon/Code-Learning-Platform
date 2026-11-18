@@ -23,7 +23,8 @@ class ConfigRead(BaseModel):
 
 
 class GenerateTestsRequest(BaseModel):
-    reference_solution: str = Field(min_length=1, max_length=64 * 1024)  # the teacher's
+    # The teacher's own solution; empty = the model writes it, cross-checked by a second one.
+    reference_solution: str = Field(default="", max_length=64 * 1024)
     count: int = Field(default=8, ge=4, le=12)
 
 
@@ -43,7 +44,9 @@ class GenerationJobRead(BaseModel):
     input_tokens: int
     output_tokens: int
     error_message: str | None
-    reference_code: str | None  # the teacher's solution, only sent back to them
+    reference_code: str | None  # the solution used; only ever sent to the course teacher
+    reference_by: str  # teacher | ai
+    check_code: str | None  # the model's second solution, when it wrote the first one
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
@@ -81,7 +84,8 @@ def generate_tests(
 ):
     """Starts a job and answers 202 at once; poll GET /generation-jobs/{id} for progress.
 
-    The teacher sends the reference solution; the model only proposes the test inputs.
+    With a reference solution from the teacher, the model only proposes the test inputs;
+    without one, it writes the solution too (decision D26).
     """
     job = ai_service.start_generation(db, assignment, user, data.count, data.reference_solution)
     background.add_task(
@@ -108,6 +112,8 @@ def get_generation_job(job_id: int, db: DbSession, user: TeacherUser):
         output_tokens=job.output_tokens,
         error_message=job.error_message,
         reference_code=job.reference_code,
+        reference_by=job.reference_by,
+        check_code=job.check_code,
         created_at=job.created_at,
         started_at=job.started_at,
         finished_at=job.finished_at,

@@ -79,20 +79,21 @@ export function AiGeneratePanel({ assignmentId, hasStatement, onFinished, interv
           </label>
           <Button
             variant="primary"
-            disabled={!hasStatement || !solution.trim() || running || start.isPending}
+            disabled={!hasStatement || running || start.isPending}
             onClick={() => start.mutate()}
           >
             {running ? "Generating…" : "Generate tests with AI"}
           </Button>
         </div>
         <p className="plain text-sm text-ink-3">
-          The model reads the saved task statement and your reference solution and proposes test inputs;
-          it writes no code. Your solution runs on every input in the sandbox and its output becomes the
-          expected output. New tests arrive as drafts and count only after you approve them.
+          Paste your reference solution and the model only proposes test inputs. Leave it empty and the
+          model also writes the solution, plus a second one of its own to cross-check it: tests where the
+          two disagree are flagged. Either way the expected outputs come from running a solution in the
+          sandbox, never from the model. New tests arrive as drafts and count only after you approve them.
           {!hasStatement && " Save a task statement first."}
         </p>
         <label className="label">
-          Your reference solution
+          Your reference solution (optional)
           <textarea
             className="field mono mt-1 min-h-32"
             value={solution}
@@ -107,7 +108,12 @@ export function AiGeneratePanel({ assignmentId, hasStatement, onFinished, interv
           <div role="status" aria-live="polite" className="grid gap-2">
             {running && (
               <>
-                <p className="text-ink">{PHASES[job.data.phase] ?? "Working"}…</p>
+                <p className="text-ink">
+                  {job.data.phase === "writing" && job.data.reference_by === "ai"
+                    ? "Writing the solution and the tests"
+                    : (PHASES[job.data.phase] ?? "Working")}
+                  …
+                </p>
                 <span className="bar">
                   <i className="animate-pulse" style={{ "--w": `${({ queued: 10, writing: 35, sandbox: 65, linking: 90 })[job.data.phase] ?? 50}%` }} />
                 </span>
@@ -117,7 +123,7 @@ export function AiGeneratePanel({ assignmentId, hasStatement, onFinished, interv
               <p className="text-ok">
                 {plural(job.data.tests_kept ?? 0, "test")} ready for review
                 {job.data.tests_proposed > job.data.tests_kept &&
-                  ` (${job.data.tests_proposed - job.data.tests_kept} dropped: your solution failed on them)`}
+                  ` (${job.data.tests_proposed - job.data.tests_kept} dropped: the solution failed on them)`}
                 .
               </p>
             )}
@@ -169,6 +175,7 @@ function DraftCard({ test, index, onChanged }) {
         <Chip tone="pink">AI draft</Chip>
         {test.is_hidden && <Chip tone="neutral">hidden</Chip>}
         <Chip tone="neutral">weight {test.weight}</Chip>
+        {test.ai_check_output != null && <Chip tone="bad">solutions disagree</Chip>}
         {test.concepts.length === 0 && <Chip tone="warn">no concept</Chip>}
         {test.concepts.map((concept) => (
           <Chip key={concept.id}>{concept.name}</Chip>
@@ -218,6 +225,11 @@ function DraftCard({ test, index, onChanged }) {
         <div className="grid gap-2 md:grid-cols-2">
           <Block label="Input" value={test.input_data} />
           <Block label="Expected output (from the sandbox)" value={test.expected_output} />
+          {test.ai_check_output != null && (
+            <div className="md:col-span-2">
+              <Block label="The second AI solution printed instead: check which one is right" value={test.ai_check_output} />
+            </div>
+          )}
         </div>
       )}
       {test.materials?.length > 0 && (
@@ -265,12 +277,20 @@ function DraftCard({ test, index, onChanged }) {
 function ReferenceSolution({ jobId }) {
   const job = useGenerationJob(jobId);
   if (!job.data?.reference_code) return null;
+  const byAi = job.data.reference_by === "ai";
   return (
     <details className="dash-top px-6 py-4">
       <summary className="cursor-pointer text-sm text-accent-strong">
-        Reference solution used · {job.data.model} · {job.data.input_tokens + job.data.output_tokens} tokens
+        {byAi ? "Solution written by the AI: check it before approving" : "Your reference solution"} ·{" "}
+        {job.data.model} · {job.data.input_tokens + job.data.output_tokens} tokens
       </summary>
       <pre className="io mt-3 max-h-80 overflow-auto p-4 font-mono text-sm">{job.data.reference_code}</pre>
+      {job.data.check_code && (
+        <>
+          <p className="mt-4 text-sm text-ink-3">Second AI solution, written separately to cross-check the first:</p>
+          <pre className="io mt-2 max-h-80 overflow-auto p-4 font-mono text-sm">{job.data.check_code}</pre>
+        </>
+      )}
     </details>
   );
 }

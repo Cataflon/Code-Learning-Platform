@@ -3,7 +3,7 @@ import { apiFetch } from "./client.js";
 /** { ai_available } - whether the server has a key for its AI provider (NVIDIA or Anthropic). */
 export const getConfig = () => apiFetch("/config");
 
-/** The teacher's reference solution produces the expected outputs; the model only proposes inputs. */
+/** With the teacher's solution the model proposes inputs only; with "" it writes the solution too. */
 export const generateTests = (assignmentId, count, referenceSolution) =>
   apiFetch(`/assignments/${assignmentId}/generate-tests`, {
     method: "POST",

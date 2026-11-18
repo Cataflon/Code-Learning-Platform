@@ -457,8 +457,8 @@ Documentul pornește de la valorile din coloana „Default propus”. Răspunde 
 | D22 | Vizibilitatea materialelor | vizibile imediat studenților înscriși la curs | stare ciornă/publicat, ca la teme |  |
 | D23 | Formatul paginilor indicate | text liber validat, de exemplu „12-15, 18”; linkul deschide prima pagină | o singură pagină; selector vizual de pagini |  |
 | D24 | Limita fișierelor încărcate | 20 MB pe fișier, doar PDF și PPTX | 50 MB; adăugarea altor formate (DOCX) |  |
-| D25 | Modelul pentru generarea testelor (Pasul 9) | implicit catalogul NVIDIA (cheie gratuită), prin endpoint-ul compatibil OpenAI și SDK-ul `openai`: `AI_PROVIDER=nvidia`, `NVIDIA_API_KEY`, `AI_MODEL=qwen/qwen3-next-80b-a3b-instruct`; Claude rămâne opțiune (`AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`); cheia nu ajunge în frontend sau în git (decis 17.11.2026, revizuit 18.11.2026) | alt furnizor prin `LLMClient` |  |
-| D26 | Sursa lui `expected_output` la testele generate | soluția de referință o scrie profesorul și rulează în sandbox pe fiecare intrare; modelul propune doar intrările, nu scrie cod și nu scrie ieșiri (decis 17.11.2026, revizuit 18.11.2026) | n/a |  |
+| D25 | Modelul pentru generarea testelor (Pasul 9) | implicit Gemini (Google AI Studio, cheie gratuită) prin endpoint-ul compatibil OpenAI și SDK-ul `openai`, cu schemă JSON impusă: `AI_PROVIDER=gemini`, `GEMINI_API_KEY`, `gemini-3.5-flash` cu rezerve `gemini-3.5-flash-lite` și `gemini-3.1-flash-lite` la 503/429/timeout; catalogul NVIDIA și Claude rămân opțiuni; cheia nu ajunge în frontend sau în git (decis 17.11.2026, revizuit 18.11.2026) | alt furnizor prin `LLMClient` |  |
+| D26 | Sursa lui `expected_output` la testele generate | rularea unei soluții de referință în sandbox, niciodată textul modelului. Soluția e a profesorului dacă o lipește; altfel o scrie modelul, care trebuie să treacă exemplul din enunț și e verificată de o a doua soluție scrisă separat (testele unde diferă sunt marcate); totul rămâne ciornă până la aprobare (decis 17.11.2026, revizuit 18.11.2026) | n/a |  |
 | D27 | Căutarea paginilor candidate | full-text search PostgreSQL (`tsvector`, dicționar `simple`); fără tehnologie nouă, suficient pentru câteva sute de pagini (decis 17.11.2026) | embeddings cu pgvector |  |
 | D28 | Testele generate | ciorne până la aprobarea profesorului; evaluarea ignoră ciornele; profesorul răspunde pentru teste (decis 17.11.2026) | aprobare automată |  |
 | D29 | Disponibilitatea AI | funcție opțională: fără cheie, butonul nu apare și endpoint-urile răspund 503; aplicația merge și fără cont Claude (decis 17.11.2026) | AI obligatoriu |  |
@@ -929,7 +929,7 @@ class Runner(Protocol):
 
 Pas adăugat pe 17.11.2026 din documentul „Pasul 9 - Teste generate cu Claude” și revizuit pe 18.11.2026: modelul nu mai scrie cod (soluția de referință e a profesorului), iar furnizorul implicit e catalogul NVIDIA, cu cheie gratuită. Are prioritate față de restul planului unde se contrazic. Începe doar după ce pașii 0-8 sunt gata și testați: MVP-ul rămâne fără această funcție și consumă săptămâna de rezervă. Dacă timpul nu ajunge, se taie în ordinea: (a) legarea automată de materiale, (b) toată funcția; generarea testelor fără legare e deja utilă.
 
-**Obiectiv.** Profesorul scrie enunțul temei, lipește soluția lui de referință și apasă „Generate tests with AI”: platforma cere modelului 6-12 intrări (fără cod, fără ieșiri), rulează soluția profesorului în sandbox ca să obțină ieșirile așteptate, propune conceptul, ponderea, vizibilitatea și materialul cu paginile fiecărui test, și salvează totul ca ciornă. Profesorul revizuiește și aprobă; doar testele aprobate contează la evaluare și sunt vizibile studenților. Testele scrise manual rămân posibile, exact ca până acum.
+**Obiectiv.** Profesorul scrie titlul și enunțul temei (soluția lui de referință e opțională) și apasă „Generate tests with AI”: platforma cere modelului 6-12 intrări (fără cod, fără ieșiri), rulează soluția profesorului în sandbox ca să obțină ieșirile așteptate, propune conceptul, ponderea, vizibilitatea și materialul cu paginile fiecărui test, și salvează totul ca ciornă. Profesorul revizuiește și aprobă; doar testele aprobate contează la evaluare și sunt vizibile studenților. Testele scrise manual rămân posibile, exact ca până acum.
 
 **Regula principală.** Modelul nu scrie cod și nu scrie niciodată `expected_output`. Soluția de referință e a profesorului, iar ieșirea așteptată vine doar din rularea ei în sandbox (D26): un LLM greșește des ieșirile și poate scrie o soluție greșită, iar un test greșit penalizează un student cu cod corect.
 
@@ -937,7 +937,7 @@ Pas adăugat pe 17.11.2026 din documentul „Pasul 9 - Teste generate cu Claude�
 
 - `LLMClient` e o interfață, ca `Runner`: `complete_json(system, user, schema) -> dict`. `NvidiaClient` (implicit) folosește SDK-ul oficial `openai` cu adresa catalogului NVIDIA (`AI_BASE_URL`), iar `ClaudeClient` SDK-ul oficial `anthropic` (D25); ambele cu timeout `AI_TIMEOUT_S` și 2 reîncercări cu așteptare exponențială la 429/5xx; `FakeLLMClient` întoarce răspunsuri fixe în teste. Endpoint-ul NVIDIA nu are câmp pentru schemă JSON, deci schema intră în mesajul de sistem, iar răspunsul se curăță (fără bloc ```json) și se validează cu Pydantic; JSON invalid se mai cere o dată, apoi jobul trece în `error`.
 - Funcția e opțională (D29): `ai_available = AI_ENABLED and` cheia furnizorului ales (`NVIDIA_API_KEY` sau `ANTHROPIC_API_KEY`). Fără cheie, butonul nu apare și endpoint-urile răspund 503. Cheia nu apare în loguri, în răspunsuri, în teste sau în git.
-- Generarea rulează ca job în fundal, ca trimiterile (Pasul 5): `POST /assignments/{id}/generate-tests` primește `{reference_solution, count}` (soluția e obligatorie; lipsă sau goală dă 422) și răspunde 202 cu `{job_id}`, iar interfața face polling la 2 s pe `GET /generation-jobs/{id}`. Ca la trimiteri, la pornirea aplicației joburile rămase `queued` sau `running` devin `error`.
+- Generarea rulează ca job în fundal, ca trimiterile (Pasul 5): `POST /assignments/{id}/generate-tests` primește `{reference_solution, count}` (soluția e opțională: goală = o scrie modelul, verificată de o a doua soluție și de exemplul din enunț, revizuirea din 18.11.2026) și răspunde 202 cu `{job_id}`, iar interfața face polling la 2 s pe `GET /generation-jobs/{id}`. Ca la trimiteri, la pornirea aplicației joburile rămase `queued` sau `running` devin `error`.
 - **Generarea (`AIService.generate_tests`)**:
   1. Jobul trece în `running`; se încarcă tema (enunț, limite) și conceptele cursului.
   2. Apelul 1 către model primește enunțul (cel mult 8 000 de caractere), soluția profesorului (cel mult 16 000), limbajul (Python 3.12), limitele, numele conceptelor cursului și numărul de teste dorit. Întoarce JSON `{tests: [{name, input, concepts, hidden, weight, rationale}]}`. Promptul cere cazuri normale, cazuri limită și cel puțin o intrare mare, intrări valide pentru soluție, concepte doar din lista primită, niciun cod și nicio ieșire așteptată.
@@ -957,12 +957,13 @@ Pas adăugat pe 17.11.2026 din documentul „Pasul 9 - Teste generate cu Claude�
 
 ```text
 AI_ENABLED=true
-AI_PROVIDER=nvidia            # sau anthropic
-NVIDIA_API_KEY=              # gratuită: build.nvidia.com, Get API Key
+AI_PROVIDER=gemini            # sau nvidia, anthropic
+GEMINI_API_KEY=              # gratuită: aistudio.google.com, Get API key
+NVIDIA_API_KEY=
 ANTHROPIC_API_KEY=
-AI_BASE_URL=https://integrate.api.nvidia.com/v1
-AI_MODEL=qwen/qwen3-next-80b-a3b-instruct   # cu Claude: claude-sonnet-5-5
-AI_TIMEOUT_S=60
+AI_MODEL=                    # gol = gemini-3.5-flash
+AI_FALLBACK_MODELS=          # gol = gemini-3.5-flash-lite, gemini-3.1-flash-lite
+AI_TIMEOUT_S=0               # pe încercare; 0 = 45 s la Gemini, 120 s la ceilalți
 AI_MAX_JOBS_PER_HOUR=5
 ```
 
@@ -974,7 +975,7 @@ AI_MAX_JOBS_PER_HOUR=5
 - `app/api/v1/ai.py` cu rutele noi și `GET /config`; `app/cli.py` cu `reindex-materials`.
 - Evaluarea din `submission_service` și agregările din `dashboard_service` și `report_service` filtrează `review_status = approved`.
 - Dependințele `openai` și `anthropic` în `pyproject.toml`.
-- Frontend, în editorul temei: câmpul „Your reference solution” și butonul „Generate tests with AI” (doar dacă `ai_available`, dezactivat cu enunț gol sau fără soluție); panoul cu starea jobului („Proposing test inputs”, „Running in sandbox”, „Linking materials”, apoi „8 tests ready for review” sau eroarea); ciornele ca carduri (nume, intrare, ieșire așteptată, concept, ascuns, pondere, materialul propus cu link spre vizualizator, `ai_rationale` scris mic) cu Approve, Edit, Delete și, sus, „Approve all” cu numărul de ciorne rămase; soluția folosită și tokenii într-o secțiune pliată; eticheta „AI” pe testele aprobate cu `source = ai`.
+- Frontend, în editorul temei: câmpul opțional „Your reference solution (optional)” și butonul „Generate tests with AI” (doar dacă `ai_available`, dezactivat cu enunț gol); panoul cu starea jobului („Proposing test inputs”, „Running in sandbox”, „Linking materials”, apoi „8 tests ready for review” sau eroarea); ciornele ca carduri (nume, intrare, ieșire așteptată, concept, ascuns, pondere, materialul propus cu link spre vizualizator, `ai_rationale` scris mic) cu Approve, Edit, Delete și, sus, „Approve all” cu numărul de ciorne rămase; soluția folosită și tokenii într-o secțiune pliată; eticheta „AI” pe testele aprobate cu `source = ai`.
 
 **Tehnologii explicate**
 
@@ -987,7 +988,7 @@ AI_MAX_JOBS_PER_HOUR=5
 
 - răspuns JSON invalid: o reîncercare, apoi job `error`;
 - `expected_output` vine din rularea soluției profesorului, nu din răspuns (un răspuns fals cu ieșiri greșite nu le salvează); promptul conține soluția, iar schema nu cere cod;
-- fără soluție de referință: 422;
+- fără soluție de referință: modelul o scrie, a doua soluție o verifică (testele unde diferă primesc `ai_check_output`), iar o soluție care nu trece exemplul din enunț oprește jobul;
 - `NvidiaClient`: JSON într-un bloc ```json acceptat, răspuns tăiat și erorile SDK-ului transformate în `LLMError` (clientul SDK e înlocuit, fără rețea);
 - o intrare pe care soluția dă eroare sau depășește timpul e eliminată (`tests_kept < tests_proposed`);
 - soluție nedeterministă: job `error`;
@@ -999,7 +1000,7 @@ AI_MAX_JOBS_PER_HOUR=5
 
 **Gata când**
 
-- [ ] profesorul scrie un enunț, lipește soluția, apasă butonul și în sub 2 minute vede 6-12 ciorne cu ieșiri corecte (verificat manual pe 3 teme diferite)
+- [ ] profesorul scrie un enunț, apasă butonul și în sub 2 minute vede 6-12 ciorne cu ieșiri corecte (verificat manual pe 3 teme diferite)
 - [ ] cel puțin jumătate din ciorne au material și pagini propuse, pentru un curs cu PDF-uri care au text
 - [ ] după „Approve all”, un student e evaluat doar pe testele aprobate, iar la un test picat popup-ul arată materialul propus de AI
 - [ ] toate testele de mai sus trec în CI, fără apeluri reale la vreun model
