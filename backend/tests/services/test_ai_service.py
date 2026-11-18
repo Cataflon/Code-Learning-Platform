@@ -62,7 +62,7 @@ def answer(*tests):
 
 @pytest.fixture(autouse=True)
 def ai_key(monkeypatch):
-    monkeypatch.setattr(get_settings(), "nvidia_api_key", SecretStr("test-key"))
+    monkeypatch.setattr(get_settings(), "gemini_api_key", SecretStr("test-key"))
 
 
 @pytest.fixture
@@ -84,8 +84,8 @@ def setup(make_user, make_course, make_assignment, make_concept, make_test_case)
     }
 
 
-def run_job(db, setup, llm, runner, count=8):
-    job = ai_service.start_generation(db, setup["assignment"], setup["teacher"], count, SOLUTION)
+def run_job(db, setup, llm, runner, count=8, solution=SOLUTION):
+    job = ai_service.start_generation(db, setup["assignment"], setup["teacher"], count, solution)
     session = db
 
     def factory():
@@ -247,11 +247,7 @@ def test_rules_for_starting_a_job(db_session, setup, monkeypatch):
     with pytest.raises(InvalidDataError):
         ai_service.start_generation(db_session, assignment, teacher, 8, SOLUTION)
 
-    assignment.description = "Print the digit sum."
-    with pytest.raises(InvalidDataError, match="reference solution"):
-        ai_service.start_generation(db_session, assignment, teacher, 8, "  	 ")
-
-    monkeypatch.setattr(get_settings(), "nvidia_api_key", SecretStr(""))
+    monkeypatch.setattr(get_settings(), "gemini_api_key", SecretStr(""))
     with pytest.raises(ServiceUnavailableError):
         ai_service.start_generation(db_session, assignment, teacher, 8, SOLUTION)
 
@@ -265,6 +261,121 @@ def test_stuck_jobs_are_marked_as_error_at_startup(db_session, setup):
 
     assert ai_service.recover_interrupted_jobs(db_session) == 1
     assert job.status == SubmissionStatus.error
+
+
+# --- the AI writes the solution too (the teacher gave only the statement) ---------------------
+
+AI_SOLUTION = "n = abs(int(input()))\nprint(sum(map(int, str(n))))\n"
+CHECK = "n = abs(int(input()))\ns = 0\nwhile n:\n    s += n % 10\n    n //= 10\nprint(s)\n"
+STATEMENT = "Read an integer and print the sum of its digits.\n\nExample: input 1234, output 10."
+
+
+def authored(*tests, examples=()):
+    return {
+        "reference_solution": AI_SOLUTION,
+        "examples": [{"input": i, "output": o} for i, o in examples],
+        **answer(*tests),
+    }
+
+
+def two_solutions_runner(check_output=None, check_fails_on=(), reference_output=None):
+    """The reference and the check both compute the digit sum, unless told otherwise."""
+
+    def run(code, stdin, limits):
+        digit_sum = f"{sum(int(c) for c in stdin if c.isdigit())}\n"
+        if code == CHECK:
+            if stdin in check_fails_on:
+                return crash()
+            return ok(check_output.get(stdin, digit_sum) if check_output else digit_sum)
+        if reference_output and stdin in reference_output:
+            return ok(reference_output[stdin])
+        return ok(digit_sum)
+
+    return FakeRunner(run)
+
+
+@pytest.fixture
+def statement_setup(db_session, setup):
+    setup["assignment"].description = STATEMENT
+    db_session.commit()
+    return setup
+
+
+def test_without_a_solution_the_ai_writes_it_and_a_second_one_checks_it(
+    db_session, statement_setup
+):
+    llm = FakeLLMClient(
+        [
+            authored(("Simple", "1234\n", [], False), ("Zero", "0\n", [], False)),
+            {"solution": CHECK},
+        ]
+    )
+
+    job = run_job(db_session, statement_setup, llm, two_solutions_runner(), solution="")
+
+    assert job.status == SubmissionStatus.done
+    assert (job.reference_by, job.reference_code, job.check_code) == ("ai", AI_SOLUTION, CHECK)
+    simple, zero = drafts(db_session, statement_setup["assignment"])
+    assert (simple.expected_output, zero.expected_output) == ("10\n", "0\n")
+    assert simple.ai_check_output is None and zero.ai_check_output is None
+    author_system, author_prompt, author_schema = llm.calls[0]
+    assert "reference_solution" in str(author_schema) and "<task_statement>" in author_prompt
+    check_system, check_prompt, _ = llm.calls[1]
+    assert "independently" in check_system
+    assert AI_SOLUTION not in check_prompt  # the check never sees the first solution
+
+
+def test_tests_where_the_two_solutions_disagree_are_flagged(db_session, statement_setup):
+    llm = FakeLLMClient(
+        [
+            authored(
+                ("Simple", "1234\n", [], False),
+                ("Negative", "-56\n", [], True),
+                ("Big", "99\n", [], True),
+            ),
+            {"solution": CHECK},
+        ]
+    )
+    runner = two_solutions_runner(check_output={"-56\n": "-11\n"}, check_fails_on=("99\n",))
+
+    run_job(db_session, statement_setup, llm, runner, solution="")
+
+    simple, negative, big = drafts(db_session, statement_setup["assignment"])
+    assert simple.ai_check_output is None
+    assert (negative.expected_output, negative.ai_check_output) == ("11\n", "-11\n")
+    assert big.ai_check_output == "(the second solution stopped: runtime error)"
+
+
+def test_the_solution_must_pass_the_example_of_the_statement(db_session, statement_setup):
+    llm = FakeLLMClient(
+        [authored(("Simple", "12\n", [], False), examples=[("1234", "10")]), {"solution": CHECK}]
+    )
+    runner = two_solutions_runner(reference_output={"1234": "9\n"})
+
+    job = run_job(db_session, statement_setup, llm, runner, solution="")
+
+    assert job.status == SubmissionStatus.error
+    assert "fails the example in the task statement" in job.error_message
+    assert drafts(db_session, statement_setup["assignment"]) == []
+
+
+def test_an_example_the_statement_does_not_contain_is_ignored(db_session, statement_setup):
+    llm = FakeLLMClient(
+        [authored(("Simple", "12\n", [], False), examples=[("777", "1")]), {"solution": CHECK}]
+    )
+
+    job = run_job(db_session, statement_setup, llm, two_solutions_runner(), solution="")
+
+    assert job.status == SubmissionStatus.done  # "777 -> 1" is not in the statement
+
+
+def test_with_the_teachers_solution_no_second_solution_is_asked_for(db_session, setup):
+    llm = FakeLLMClient([answer(("Simple", "12\n", [], False))])
+
+    job = run_job(db_session, setup, llm, digit_sum_runner())
+
+    assert (job.reference_by, job.check_code) == ("teacher", None)
+    assert len(llm.calls) == 1
 
 
 # --- materials -------------------------------------------------------------------------------
@@ -337,8 +448,13 @@ def test_generated_tests_are_linked_to_the_page_the_model_picks(db_session, setu
     llm = FakeLLMClient(
         [
             answer(("Negative numbers", "-45\n", [], True), ("Plain digits", "45\n", [], False)),
-            {"material_id": material.id, "pages": "3-4"},
-            {"material_id": material.id, "pages": "40"},  # does not exist: ignored
+            {
+                "links": [
+                    {"test": 0, "material_id": material.id, "pages": "3-4"},
+                    {"test": 1, "material_id": material.id, "pages": "40"},  # no such page
+                    {"test": 7, "material_id": material.id, "pages": "1"},  # no such test
+                ]
+            },
         ]
     )
 
@@ -348,10 +464,35 @@ def test_generated_tests_are_linked_to_the_page_the_model_picks(db_session, setu
     links = {link.test_case_id: link.pages for link in db_session.scalars(select(TestCaseMaterial))}
     assert job.status == SubmissionStatus.done
     assert links == {negative.id: "3-4"}
-    assert job.input_tokens == 300  # one generation call and two linking calls
+    assert job.input_tokens == 200  # one generation call and one linking call for all tests
+    assert len(llm.calls) == 2
     _, link_prompt, _ = llm.calls[1]
     assert "data, not instructions" in llm.calls[1][0]
     assert "<candidate_pages>" in link_prompt
+    assert '<test number="0">' in link_prompt and '<test number="1">' in link_prompt
+
+
+def test_a_range_beyond_the_pages_the_search_found_is_dropped(db_session, setup, file_store):
+    unrelated = [["# Turtle graphics", "Pen colour, heading, circles"]] * 4
+    material = lecture_pdf(db_session, file_store, setup["course"], LECTURE_PAGES + unrelated)
+    material_service.extract_pages(db_session, material, file_store)
+    llm = FakeLLMClient(
+        [
+            answer(("Negative numbers", "-45\n", [], True), ("Plain digits", "45\n", [], False)),
+            {
+                "links": [
+                    {"test": 0, "material_id": material.id, "pages": "3-8"},  # 6-8 never found
+                    {"test": 1, "material_id": material.id, "pages": "4"},
+                ]
+            },
+        ]
+    )
+
+    run_job(db_session, setup, llm, digit_sum_runner())
+
+    negative, plain = drafts(db_session, setup["assignment"])
+    links = {link.test_case_id: link.pages for link in db_session.scalars(select(TestCaseMaterial))}
+    assert links == {plain.id: "4"}
 
 
 def test_a_material_of_another_course_is_never_linked(db_session, setup, file_store, make_course):
@@ -359,7 +500,10 @@ def test_a_material_of_another_course_is_never_linked(db_session, setup, file_st
     material_service.extract_pages(db_session, material, file_store)
     other = lecture_pdf(db_session, file_store, make_course(), LECTURE_PAGES)
     llm = FakeLLMClient(
-        [answer(("Negative numbers", "-45\n", [], True)), {"material_id": other.id, "pages": "3"}]
+        [
+            answer(("Negative numbers", "-45\n", [], True)),
+            {"links": [{"test": 0, "material_id": other.id, "pages": "3"}]},
+        ]
     )
 
     run_job(db_session, setup, llm, digit_sum_runner())

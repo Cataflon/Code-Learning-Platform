@@ -23,11 +23,35 @@ class GeneratedTest(BaseModel):
 
 
 class GenerationResult(BaseModel):
-    """Only test inputs: the reference solution is the teacher's (decision D26)."""
+    """Test inputs for the teacher's own solution."""
 
     tests: list[GeneratedTest] = Field(min_length=1, max_length=20)
 
 
-class MaterialChoice(BaseModel):
+class StatementExample(BaseModel):
+    input: str = Field(max_length=64 * 1024)
+    output: str = Field(max_length=64 * 1024)
+
+
+class AuthoredResult(BaseModel):
+    """The model wrote the solution: the solution, the statement's examples and the inputs."""
+
+    reference_solution: str = Field(min_length=1, max_length=64 * 1024)
+    examples: list[StatementExample] = Field(default_factory=list, max_length=10)
+    tests: list[GeneratedTest] = Field(min_length=1, max_length=20)
+
+
+class CheckSolution(BaseModel):
+    """A second, independent solution that cross-checks the first one."""
+
+    solution: str = Field(min_length=1, max_length=64 * 1024)
+
+
+class LinkChoice(BaseModel):
+    test: int
     material_id: int | None = None
     pages: str = Field(default="", max_length=200)
+
+
+class LinkChoices(BaseModel):
+    links: list[LinkChoice] = Field(default_factory=list, max_length=50)

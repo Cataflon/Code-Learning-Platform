@@ -41,7 +41,7 @@ def scripted_answer():
 
 @pytest.fixture
 def with_key(monkeypatch):
-    monkeypatch.setattr(get_settings(), "nvidia_api_key", SecretStr("test-key"))
+    monkeypatch.setattr(get_settings(), "gemini_api_key", SecretStr("test-key"))
 
 
 @pytest.fixture
@@ -58,10 +58,10 @@ def setup(client, make_user, make_course, make_assignment, make_concept, make_te
 
 
 def test_config_says_whether_ai_is_available(client, monkeypatch):
-    monkeypatch.setattr(get_settings(), "nvidia_api_key", SecretStr(""))
+    monkeypatch.setattr(get_settings(), "gemini_api_key", SecretStr(""))
     assert client.get(f"{API}/config").json() == {"ai_available": False}
 
-    monkeypatch.setattr(get_settings(), "nvidia_api_key", SecretStr("key"))
+    monkeypatch.setattr(get_settings(), "gemini_api_key", SecretStr("key"))
     assert client.get(f"{API}/config").json() == {"ai_available": True}
 
     monkeypatch.setattr(get_settings(), "ai_enabled", False)
@@ -117,7 +117,7 @@ def test_generation_end_to_end_then_approve(client, auth, setup, with_key):
 
 def test_without_a_key_generation_answers_503(client, auth, setup, monkeypatch):
     teacher, _, _, assignment, llm = setup
-    monkeypatch.setattr(get_settings(), "nvidia_api_key", SecretStr(""))
+    monkeypatch.setattr(get_settings(), "gemini_api_key", SecretStr(""))
 
     response = client.post(
         f"{API}/assignments/{assignment.id}/generate-tests", json=BODY, headers=auth(teacher)
@@ -156,7 +156,7 @@ def test_other_teachers_and_students_cannot_start_or_read_jobs(
 
 def test_the_api_key_never_appears_in_answers(client, auth, setup, monkeypatch):
     teacher, _, _, assignment, _ = setup
-    monkeypatch.setattr(get_settings(), "nvidia_api_key", SecretStr("nvapi-secret-value"))
+    monkeypatch.setattr(get_settings(), "gemini_api_key", SecretStr("nvapi-secret-value"))
 
     started = client.post(
         f"{API}/assignments/{assignment.id}/generate-tests", json=BODY, headers=auth(teacher)
@@ -178,13 +178,37 @@ def test_reindex_returns_the_number_of_text_pages(client, auth, setup, make_mate
     assert response.json()["text_pages"] == 0  # blank pages: nothing to search
 
 
-def test_the_reference_solution_is_required(client, auth, setup, with_key):
-    teacher, _, _, assignment, llm = setup
-    url = f"{API}/assignments/{assignment.id}/generate-tests"
+def test_without_a_solution_the_ai_writes_it(client, auth, setup, with_key):
+    teacher, _, _, assignment, _ = setup
+    written = "n = abs(int(input()))\nprint(sum(map(int, str(n))))\n"
+    check = "print(sum(int(c) for c in input() if c.isdigit()))\n"
+    llm = FakeLLMClient(
+        [{"reference_solution": written, "examples": [], **scripted_answer()}, {"solution": check}]
+    )
+    client.app.dependency_overrides[get_llm_client] = lambda: llm
+    headers = auth(teacher)
 
-    for body in ({"count": 8}, {"count": 8, "reference_solution": ""}, None):
-        assert client.post(url, json=body, headers=auth(teacher)).status_code == 422
-    blank = client.post(url, json={"reference_solution": "   "}, headers=auth(teacher))
-    assert blank.status_code == 422
-    assert "reference solution" in blank.json()["detail"]
+    started = client.post(
+        f"{API}/assignments/{assignment.id}/generate-tests", json={"count": 6}, headers=headers
+    )
+    job = client.get(f"{API}/generation-jobs/{started.json()['job_id']}", headers=headers).json()
+
+    assert started.status_code == 202
+    assert (job["status"], job["reference_by"]) == ("done", "ai")
+    assert (job["reference_code"], job["check_code"]) == (written, check)
+    drafts = client.get(
+        f"{API}/assignments/{assignment.id}/test-cases", params={"review": "draft"}, headers=headers
+    ).json()
+    assert [(t["expected_output"], t["ai_check_output"]) for t in drafts] == [
+        ("10\n", None),
+        ("21\n", None),
+    ]
+
+
+def test_a_body_is_still_required(client, auth, setup, with_key):
+    teacher, _, _, assignment, llm = setup
+    response = client.post(
+        f"{API}/assignments/{assignment.id}/generate-tests", headers=auth(teacher)
+    )
+    assert response.status_code == 422
     assert llm.calls == []

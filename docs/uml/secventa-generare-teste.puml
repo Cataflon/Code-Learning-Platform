@@ -7,12 +7,12 @@ participant "Browser\n(AssignmentEditor)" as B
 participant "Router\n/api/v1/ai" as R
 participant "AIService" as S
 database "PostgreSQL" as DB
-participant "LLMClient\n(NvidiaClient)" as L
-participant "API-ul modelului\n(NVIDIA / Claude)" as C
+participant "LLMClient\n(OpenAICompatibleClient)" as L
+participant "API-ul modelului\n(Gemini / NVIDIA / Claude)" as C
 participant "Runner\n(DockerRunner)" as D
 
-T -> B : soluția de referință + Generate tests with AI (count)
-B -> R : POST /assignments/{id}/generate-tests\n{reference_solution, count}
+T -> B : Generate tests with AI (count), soluția e opțională
+B -> R : POST /assignments/{id}/generate-tests\n{reference_solution?, count}
 R -> S : start_generation()
 S -> DB : verifică: un singur job activ, limita pe oră, enunț, soluție
 S -> DB : INSERT generation_jobs (queued, reference_code)
@@ -25,27 +25,43 @@ loop polling la 2 s
 end
 
 S -> DB : status = running
-S -> L : complete_json(enunț, soluția profesorului, limite, concepte)
-L -> C : chat completions (schema în mesajul de sistem)
-C --> L : doar intrări (fără cod, fără ieșiri)
+alt profesorul a dat soluția
+  S -> L : complete_json(enunț, soluția profesorului, limite, concepte)
+  L -> C : chat completions (schema JSON)
+  C --> L : doar intrări (fără cod, fără ieșiri)
+else fără soluție
+  S -> L : complete_json(enunț, limite, concepte)
+  L -> C : chat completions (schema JSON)
+  C --> L : soluție + exemplele din enunț + intrări
+  S -> L : complete_json(enunț): a doua soluție, separat
+  L -> C : chat completions
+  C --> L : a doua soluție
+end
+note right of L : la 503/429/timeout\ntrece pe modelul de rezervă
 L --> S : JSON validat cu Pydantic
 
+opt soluția e scrisă de model
+  S -> D : run(reference_code, exemplul din enunț)
+  D --> S : trebuie să dea ieșirea din enunț
+end
 loop pentru fiecare intrare
   S -> D : run(reference_code, input, limite)
   D --> S : stdout / eroare / timeout
   note right of S : expected_output = stdout\n(niciodată textul modelului)
+  opt a doua soluție
+    S -> D : run(check_code, input, limite)
+    D --> S : dacă diferă: ai_check_output
+  end
 end
 
 S -> DB : INSERT test_cases (source=ai, review_status=draft)
 
-loop pentru fiecare test păstrat
-  S -> DB : ts_rank pe material_pages (tsvector)
-  S -> L : complete_json(test + pagini candidate)
-  L -> C : chat completions
-  C --> L : {material_id, pages}
-  S -> S : validează cursul și paginile
-  S -> DB : INSERT test_case_materials
-end
+S -> DB : ts_rank pe material_pages, pentru fiecare test
+S -> L : complete_json(toate testele + paginile candidate)
+L -> C : chat completions
+C --> L : {links: [{test, material_id, pages}]}
+S -> S : validează cursul, paginile și vecinătatea lor
+S -> DB : INSERT test_case_materials
 
 S -> DB : status = done, tokeni
 B -> R : GET /generation-jobs/{id}
