@@ -14,6 +14,7 @@ python -m venv .venv
 pip install -e ".[dev]"
 alembic upgrade head                         # creeaza tabelele
 python -m scripts.seed                       # date de test (parola: parola123)
+python -m scripts.seed_demo                  # curs demo pentru raport + materiale demo
 uvicorn app.main:app --reload                # http://localhost:8000/docs
 ```
 
@@ -34,3 +35,10 @@ cd frontend && npm test
 
 Documentația proiectului este în [docs/](docs/): [masterprompt.md](docs/masterprompt.md) (sursa adevărului),
 [cerinte.md](docs/cerinte.md), [decizii.md](docs/decizii.md).
+
+## Materiale de curs
+
+Fișierele încărcate stau în `uploads/` (în afara git-ului). Pentru previzualizarea PPTX trebuie
+instalat [LibreOffice](https://www.libreoffice.org/download/); pe Windows se găsește singur în
+`C:\Program Files\LibreOffice`, altfel se setează `SOFFICE_PATH` în `.env`. Fără LibreOffice,
+PDF-urile funcționează normal, iar un PPTX este refuzat cu un mesaj clar.

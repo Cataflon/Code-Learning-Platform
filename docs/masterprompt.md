@@ -260,6 +260,7 @@ Toate rutele stau sub `/api/v1`, în afară de `/health`. „Membru” înseamn�
 | `GET /users/me/activity?weeks=14` | autentificat | trimiteri pe zi și totaluri | 6 |
 | `GET /courses/{id}/stats` | profesorul cursului | `students`, `submissions_today`, `average_score` | 6 |
 | GET /me/learn | student | cardurile cursurilor la care e înscris, cu numărul de materiale și data ultimului material | 8 |
+| `GET /materials/{id}` | membru | detaliile unui material, pentru vizualizator (titlu, curs, pagini, `used_in`); adăugat în Pasul 8 | 8 |
 | GET /courses/{id}/materials | membru | lista materialelor cursului: titlu, categorie, tip, număr de pagini, data încărcării și `used_in` (temele publicate de care e legat materialul, direct sau printr-un test; profesorul le vede și pe cele nepublicate, plus `test_count`) | 8 |
 | POST /courses/{id}/materials | profesorul cursului | încarcă un PDF sau PPTX (multipart/form-data: file, title, category); PPTX-ul se convertește în PDF; răspuns 201 cu materialul | 8 |
 | PATCH /materials/{id} | profesorul cursului | redenumește materialul | 8 |
