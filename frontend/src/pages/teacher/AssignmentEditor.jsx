@@ -7,7 +7,7 @@ import * as assignmentsApi from "../../api/assignments.js";
 import { createConcept, listConcepts } from "../../api/courses.js";
 import { ErrorState, LoadingState } from "../../components/states.jsx";
 import TestCaseForm, { toRow } from "../../components/TestCaseForm.jsx";
-import { Button, Card, CardHeader, Chip, FormError, inputClass, PageHeader, TextField } from "../../components/ui.jsx";
+import { Button, buttonClass, Card, CardHeader, Chip, FormError, inputClass, PageHeader, TextField } from "../../components/ui.jsx";
 import { fromLocalInput, toLocalInput } from "../../lib/format.js";
 
 function detailsOf(assignment) {
@@ -105,7 +105,10 @@ function EditorForm({ assignment, initialTests, concepts, onSaved, onCreateConce
         badge={<Chip tone={published ? "info" : "neutral"}>{published ? "Published" : "Draft"}</Chip>}
         subtitle="Students see the problem and the visible tests. For hidden tests they only see the verdict, the concept and your hint."
         right={
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
+            <Link to={`/teacher/assignments/${assignment.id}/materials`} className={buttonClass("amber")}>
+              Study materials
+            </Link>
             <Button variant="neutral" size="lg" disabled={state.busy} onClick={() => save({})}>
               {published ? "Save changes" : "Save draft"}
             </Button>

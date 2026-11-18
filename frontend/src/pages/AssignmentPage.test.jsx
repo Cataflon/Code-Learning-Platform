@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
 import { expect, test, vi } from "vitest";
@@ -203,4 +203,80 @@ test("a server refusal such as 429 is shown next to the button", async () => {
   await user.click(screen.getByRole("button", { name: /Submit/ }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent("Wait 4 more second(s)");
+});
+
+const RECOMMENDATIONS = {
+  submission_id: 41,
+  assignment_id: 3,
+  failed_tests: [{ test_case_id: 9, name: "Hidden test #1", is_hidden: true, concepts: ["Negative numbers"] }],
+  materials: [
+    {
+      material_id: 5,
+      title: "Lecture 4: Loops and digit extraction",
+      category: "lecture",
+      file_type: "pdf",
+      page_count: 28,
+      pages: "12-15",
+      first_page: 12,
+      test_count: 1,
+      tests: ["Hidden test #1"],
+      from_assignment: false,
+    },
+  ],
+};
+
+test("after a failed test the recommendations popup opens once, with a link to the page", async () => {
+  mockApi({
+    "GET /assignments/3": ASSIGNMENT,
+    "GET /assignments/3/test-cases": TESTS,
+    "GET /assignments/3/materials": [],
+    "GET /assignments/3/submissions": pageOf([submission()]),
+    "GET /submissions/41": submission(),
+    "GET /submissions/41/recommendations": RECOMMENDATIONS,
+  });
+  const user = userEvent.setup();
+  const { unmount } = renderPage();
+
+  const dialog = await screen.findByRole("dialog", { name: "Review before your next attempt" });
+  expect(within(dialog).getByText("1 test failed in attempt 2. These materials cover it.")).toBeInTheDocument();
+  expect(within(dialog).getByText("Negative numbers")).toBeInTheDocument();
+  expect(within(dialog).getByRole("link", { name: "Open at page 12" })).toHaveAttribute(
+    "href",
+    "/learn/materials/5?page=12&rec=12-15&from=Digit+sum",
+  );
+
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  // The button next to the result brings it back on demand.
+  await user.click(screen.getByRole("button", { name: /Recommended pages/ }));
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+  unmount();
+
+  // Coming back to the page does not open it again for the same submission.
+  renderPage();
+  await screen.findByText("Result of attempt 2");
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+test("a perfect submission does not open the popup and shows the study materials card", async () => {
+  const perfect = submission({ score: 100, passed_count: 2, verdicts: ["passed", "passed"] });
+  const { calls } = mockApi({
+    "GET /assignments/3": ASSIGNMENT,
+    "GET /assignments/3/test-cases": TESTS,
+    "GET /assignments/3/materials": [
+      { material_id: 5, title: "Lecture 4", category: "lecture", file_type: "pdf", page_count: 28, pages: "12-15", first_page: 12 },
+    ],
+    "GET /assignments/3/submissions": pageOf([perfect]),
+    "GET /submissions/41": perfect,
+  });
+
+  renderPage();
+
+  expect(await screen.findByRole("link", { name: /Lecture 4/ })).toHaveAttribute(
+    "href",
+    "/learn/materials/5?page=12&rec=12-15&from=Digit+sum",
+  );
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(calls.some((call) => call.path.endsWith("/recommendations"))).toBe(false);
 });

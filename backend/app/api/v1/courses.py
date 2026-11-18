@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Depends, Query, status
 
 from app.core.deps import (
     CurrentUser,
@@ -18,7 +18,8 @@ from app.schemas.course import (
     StudentRead,
 )
 from app.schemas.dashboard import CourseStats
-from app.services import course_service, dashboard_service
+from app.services import course_service, dashboard_service, material_service
+from app.storage.file_store import FileStore, get_file_store
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -54,8 +55,13 @@ def update_course(data: CourseUpdate, course: OwnedCourse, db: DbSession, user: 
 
 
 @router.delete("/{course_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_course(course: OwnedCourse, db: DbSession) -> None:
+def delete_course(
+    course: OwnedCourse, db: DbSession, store: Annotated[FileStore, Depends(get_file_store)]
+) -> None:
+    """Rows go by cascade; the material files are removed from disk after the commit."""
+    names = material_service.stored_names_of_course(db, course.id)
     course_service.delete_course(db, course)
+    material_service.delete_files(store, names)
 
 
 @router.get("/{course_id}/students", response_model=list[StudentRead])

@@ -17,10 +17,11 @@ from sqlalchemy.orm import Session
 from app.core.errors import NotFoundError, PermissionDeniedError, UnauthorizedError
 from app.core.security import decode_token
 from app.db.session import get_db
-from app.models import Assignment, Course, Role, Submission, TestCase, User
+from app.models import Assignment, Course, Material, Role, Submission, TestCase, User
 from app.services import (
     assignment_service,
     course_service,
+    material_service,
     submission_service,
     test_case_service,
 )
@@ -113,9 +114,26 @@ def get_submission_for_viewer(submission_id: int, db: DbSession, user: CurrentUs
     return submission
 
 
+def get_material_for_member(material_id: int, db: DbSession, user: CurrentUser) -> Material:
+    """The material, if the user teaches its course or is enrolled in it."""
+    material = material_service.get_material(db, material_id)
+    if not course_service.is_member(db, user, material.course):
+        raise NotFoundError("Material not found")
+    return material
+
+
+def get_material_for_owner(material_id: int, db: DbSession, user: TeacherUser) -> Material:
+    material = material_service.get_material(db, material_id)
+    if material.course.teacher_id != user.id:
+        raise NotFoundError("Material not found")
+    return material
+
+
 MemberCourse = Annotated[Course, Depends(get_course_for_member)]
 OwnedCourse = Annotated[Course, Depends(get_course_for_owner)]
 MemberAssignment = Annotated[Assignment, Depends(get_assignment_for_member)]
 OwnedAssignment = Annotated[Assignment, Depends(get_assignment_for_owner)]
 OwnedTestCase = Annotated[TestCase, Depends(get_test_case_for_owner)]
 ViewableSubmission = Annotated[Submission, Depends(get_submission_for_viewer)]
+MemberMaterial = Annotated[Material, Depends(get_material_for_member)]
+OwnedMaterial = Annotated[Material, Depends(get_material_for_owner)]

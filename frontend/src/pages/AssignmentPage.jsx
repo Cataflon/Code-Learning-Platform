@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, List, MessageSquare, Play, Target } from "lucide-react";
+import { BookOpen, Eye, List, MessageSquare, Play, Target } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Link, useParams } from "react-router-dom";
@@ -7,12 +7,18 @@ import { Link, useParams } from "react-router-dom";
 import { getAssignment, listTestCases } from "../api/assignments.js";
 import { createSubmission, listSubmissions } from "../api/submissions.js";
 import { ErrorState, LoadingState } from "../components/states.jsx";
+import { viewerLink } from "../api/materials.js";
+import { FileBadge } from "../components/MaterialBits.jsx";
+import RecommendationDialog, { alreadyShown, markShown } from "../components/RecommendationDialog.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import TestResultRow from "../components/TestResultRow.jsx";
 import { Button, Card, CardHeader, Chip, FormError, IconBadge, PageHeader } from "../components/ui.jsx";
 import VerdictSquares from "../components/VerdictSquares.jsx";
+import { useAssignmentMaterials } from "../hooks/useMaterials.js";
+import { useRecommendations } from "../hooks/useRecommendations.js";
 import { isFinal, useSubmission } from "../hooks/useSubmission.js";
 import { capitalize, formatDay, formatSeconds, ordinal, timeAgo } from "../lib/format.js";
+import { describePages, unitOf } from "../lib/pages.js";
 
 // Monaco is large: load it only when this page is opened.
 const CodeEditor = lazy(() => import("../components/CodeEditor.jsx"));
@@ -101,7 +107,42 @@ function AttemptsCard({ attempts, activeId, onSelect }) {
   );
 }
 
-function ResultCard({ submission }) {
+/** "Study materials": where to learn for this assignment, with the pages indicated. */
+function StudyMaterialsCard({ assignmentId, assignmentTitle }) {
+  const { data } = useAssignmentMaterials(assignmentId);
+  if (!data || data.length === 0) return null;
+  return (
+    <Card tint="warn">
+      <CardHeader title="Study materials" right={<Link to="/learn">All materials</Link>} />
+      {data.map((link) => (
+        <Link
+          key={link.material_id}
+          to={viewerLink(link.material_id, {
+            page: link.first_page,
+            pages: link.pages,
+            from: assignmentTitle,
+          })}
+          className="mat"
+        >
+          <FileBadge type={link.file_type} />
+          <span className="min-w-0">
+            <b>{link.title}</b>
+            <small>
+              {link.pages ? (
+                <span className="pages">{describePages(link.pages, unitOf(link))}</span>
+              ) : (
+                describePages("", unitOf(link))
+              )}
+            </small>
+          </span>
+          <span className="go">Open</span>
+        </Link>
+      ))}
+    </Card>
+  );
+}
+
+function ResultCard({ submission, onShowMaterials }) {
   const running = !isFinal(submission.status);
   const firstPending = submission.results.findIndex((result) => result.verdict == null);
 
@@ -124,6 +165,14 @@ function ResultCard({ submission }) {
           </div>
         </div>
       </header>
+      {onShowMaterials && (
+        <div className="px-7 pb-5">
+          <Button variant="amber" size="sm" onClick={onShowMaterials}>
+            <BookOpen className="h-4 w-4" aria-hidden="true" />
+            Recommended pages
+          </Button>
+        </div>
+      )}
       {submission.status === "error" && (
         <div className="px-7 pb-5">
           <FormError>{submission.error_message ?? "This submission could not be evaluated."}</FormError>
@@ -182,6 +231,17 @@ export default function AssignmentPage() {
     },
   });
 
+  // After a finished submission with failed tests, the recommendations popup opens once.
+  const recommendations = useRecommendations(submission);
+  const hasRecommendations = (recommendations.data?.materials.length ?? 0) > 0;
+  const [dialogFor, setDialogFor] = useState(null);
+  useEffect(() => {
+    if (hasRecommendations && submission && !alreadyShown(submission.id)) {
+      markShown(submission.id);
+      setDialogFor(submission.id);
+    }
+  }, [hasRecommendations, submission]);
+
   // When the watched submission finishes, refresh the attempts list (squares and score).
   const finishedId = submission && isFinal(submission.status) ? submission.id : null;
   useEffect(() => {
@@ -238,6 +298,7 @@ export default function AssignmentPage() {
       <div className="grid gap-9 lg:grid-cols-[360px_1fr]">
         <div className="space-y-9">
           <ProblemCard assignment={assignment} examples={testsQuery.data ?? []} />
+          <StudyMaterialsCard assignmentId={assignmentId} assignmentTitle={assignment.title} />
           <AttemptsCard attempts={attempts} activeId={activeId} onSelect={setSelectedId} />
         </div>
         <div className="min-w-0 space-y-9">
@@ -262,12 +323,25 @@ export default function AssignmentPage() {
               </div>
             )}
           </Card>
-          {submission && <ResultCard submission={submission} />}
+          {submission && (
+            <ResultCard
+              submission={submission}
+              onShowMaterials={hasRecommendations ? () => setDialogFor(submission.id) : null}
+            />
+          )}
           {activeId != null && submissionQuery.isError && (
             <ErrorState error={submissionQuery.error} onRetry={submissionQuery.refetch} />
           )}
         </div>
       </div>
+      {dialogFor != null && dialogFor === submission?.id && hasRecommendations && (
+        <RecommendationDialog
+          recommendations={recommendations.data}
+          attemptNumber={submission.attempt_number}
+          assignmentTitle={assignment.title}
+          onClose={() => setDialogFor(null)}
+        />
+      )}
     </>
   );
 }

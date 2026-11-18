@@ -8,7 +8,7 @@ from app.schemas.assignment import (
     TestCaseRead,
     TestCaseUpdate,
 )
-from app.services import test_case_service
+from app.services import material_service, test_case_service
 
 router = APIRouter(tags=["test-cases"])
 
@@ -19,8 +19,15 @@ router = APIRouter(tags=["test-cases"])
 )
 def list_test_cases(assignment: MemberAssignment, db: DbSession, user: CurrentUser):
     test_cases = test_case_service.list_test_cases(db, assignment, user)
-    schema = TestCaseRead if user.role == Role.teacher else TestCasePublicRead
-    return [schema.model_validate(test_case) for test_case in test_cases]
+    if user.role != Role.teacher:
+        return [TestCasePublicRead.model_validate(test_case) for test_case in test_cases]
+    links = material_service.test_case_links(db, [test_case.id for test_case in test_cases])
+    items = []
+    for test_case in test_cases:
+        read = TestCaseRead.model_validate(test_case)
+        read.materials = links.get(test_case.id, [])
+        items.append(read)
+    return items
 
 
 @router.post(

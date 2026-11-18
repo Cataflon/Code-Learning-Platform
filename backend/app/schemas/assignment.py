@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.course import ConceptRead
+from app.schemas.material import MaterialLinkRead
 
 
 class ResultBuckets(BaseModel):
@@ -104,6 +105,8 @@ class TestCaseRead(BaseModel):
     position: int
     hint: str | None
     concepts: list[ConceptRead]
+    # Where to study when this test fails (Step 8); teacher view only.
+    materials: list[MaterialLinkRead] = []
 
 
 class TestCasePublicRead(BaseModel):

@@ -9,7 +9,10 @@ report, the dashboard and the teacher's statistics have something to show withou
 Every student also gets an earlier, worse attempt: the report must use the latest one.
 
 Idempotent: running it again changes nothing. Run with ``python -m scripts.seed_demo``.
-Step 8 adds the demo materials and Step 10 the three-week history.
+It also adds two materials to the "Digit sum" course of scripts/seed.py (Step 8): a PDF lecture
+linked to the whole assignment and, pages 12-15, to its hidden test, so the recommendations popup
+shows up after a wrong submission; and a PPTX lab, only when LibreOffice can convert it.
+Step 10 adds the three-week history.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -31,6 +34,7 @@ from app.models import (
     Verdict,
 )
 from app.services.scoring import compute_score, count_passed
+from scripts.seed import JOIN_CODE as SEED_JOIN_CODE
 from scripts.seed import SEED_PASSWORD, TEACHER_EMAIL, get_or_create_user
 
 JOIN_CODE = "DEMOPY26"
@@ -181,9 +185,156 @@ def seed_demo(db: Session) -> Course:
     return course
 
 
+LECTURE_TITLE = "Lecture 4: Loops and digit extraction"
+LAB_TITLE = "Lab 3: Input and output"
+
+
+def _lecture_pages() -> list[list[str]]:
+    pages = [["# Lecture 4", "Loops and digit extraction", "Procedural Programming"]]
+    topics = [
+        "Recap: for loops",
+        "Recap: for loops",
+        "Recap: for loops",
+        "While loops",
+        "While loops",
+        "While loops",
+        "While loops",
+        "Integer division and remainder",
+        "Integer division and remainder",
+        "Integer division and remainder",
+    ]
+    for topic in topics:
+        pages.append([f"# {topic}", "Notes for this part of the lecture."])
+    pages += [
+        [
+            "# Extracting digits with a while loop",
+            "n % 10 gives the last digit",
+            "n // 10 removes it",
+            "Repeat while n > 0",
+            "$ total = 0",
+            "$ while n > 0:",
+            "$     total += n % 10",
+            "$     n //= 10",
+        ],
+        [
+            "# What happens when n is negative",
+            "-405 > 0 is false, so the loop never starts",
+            "The sum stays at 0",
+            "Take abs(n) before the loop",
+            "$ n = abs(n)",
+            "$ while n > 0:",
+        ],
+        [
+            "# Tracing 1729 step by step",
+            "1729: digit 9, then 172",
+            "172: digit 2, then 17",
+            "17: digit 7, then 1",
+            "1: digit 1, then 0 and the loop stops",
+        ],
+        [
+            "# The special case n = 0",
+            "The loop does not run, the sum is 0",
+            "That is already the right answer",
+            "Check it anyway with a test",
+        ],
+    ]
+    for topic in ["Counting and summing"] * 4 + ["Common mistakes"] * 5 + ["Practice problems"] * 4:
+        pages.append([f"# {topic}", "Notes for this part of the lecture."])
+    return pages  # 28 pages, pages 12-15 explain digit extraction
+
+
+def seed_materials(db: Session, store=None, converter=None) -> list[str]:
+    """Idempotent: adds the two demo materials to the seed course and links them."""
+    from app.models import (
+        AssignmentMaterial,
+        FileType,
+        Material,
+        MaterialCategory,
+        TestCaseMaterial,
+    )
+    from app.services.material_service import count_pdf_pages
+    from app.storage.file_store import get_file_store
+    from app.storage.pptx_converter import ConversionError, convert_pptx_to_pdf
+    from scripts.demo_pdf import build_pdf
+
+    store = store or get_file_store()
+    converter = converter or convert_pptx_to_pdf
+    course = db.scalar(select(Course).where(Course.join_code == SEED_JOIN_CODE))
+    if course is None:
+        return ["Run python -m scripts.seed first: the seed course does not exist."]
+    notes = []
+    existing = {
+        m.title: m for m in db.scalars(select(Material).where(Material.course_id == course.id))
+    }
+    teacher_id = course.teacher_id
+
+    lecture = existing.get(LECTURE_TITLE)
+    if lecture is None:
+        source = store.temp_dir() / "lecture-04-loops.pdf"
+        source.write_bytes(build_pdf("LECTURE 4 - LOOPS", _lecture_pages()))
+        pages = count_pdf_pages(source)
+        size = source.stat().st_size
+        lecture = Material(
+            course_id=course.id,
+            title=LECTURE_TITLE,
+            category=MaterialCategory.lecture,
+            file_type=FileType.pdf,
+            original_filename="lecture-04-loops.pdf",
+            stored_filename=store.save_file(source, "pdf"),
+            size_bytes=size,
+            page_count=pages,
+            uploaded_by=teacher_id,
+        )
+        db.add(lecture)
+        db.flush()
+        notes.append(f"Added '{LECTURE_TITLE}' ({pages} pages)")
+
+    if LAB_TITLE not in existing:
+        try:
+            from tests.files import pptx_bytes
+
+            work = store.temp_dir()
+            source = work / "lab-03-io.pptx"
+            source.write_bytes(pptx_bytes(slides=6))
+            preview = converter(source, work)
+            pages = count_pdf_pages(preview)
+            size = source.stat().st_size
+            db.add(
+                Material(
+                    course_id=course.id,
+                    title=LAB_TITLE,
+                    category=MaterialCategory.lab,
+                    file_type=FileType.pptx,
+                    original_filename="lab-03-io.pptx",
+                    stored_filename=store.save_file(source, "pptx"),
+                    preview_filename=store.save_file(preview, "pdf"),
+                    size_bytes=size,
+                    page_count=pages,
+                    uploaded_by=teacher_id,
+                )
+            )
+            notes.append(f"Added '{LAB_TITLE}' ({pages} slides)")
+        except (ConversionError, ImportError) as exc:
+            notes.append(f"Skipped '{LAB_TITLE}': {exc}")
+
+    assignment = db.scalar(select(Assignment).where(Assignment.course_id == course.id))
+    if assignment is not None:
+        if db.get(AssignmentMaterial, (assignment.id, lecture.id)) is None:
+            db.add(
+                AssignmentMaterial(assignment_id=assignment.id, material_id=lecture.id, pages="")
+            )
+        hidden = next((t for t in assignment.test_cases if t.is_hidden), None)
+        if hidden is not None and db.get(TestCaseMaterial, (hidden.id, lecture.id)) is None:
+            db.add(TestCaseMaterial(test_case_id=hidden.id, material_id=lecture.id, pages="12-15"))
+    db.commit()
+    return notes
+
+
 def main() -> None:
     with get_session_factory()() as db:
         course = seed_demo(db)
+        for note in seed_materials(db):
+            print(note)
         print(f"Demo course ready: '{course.title}', join code {course.join_code}")
         print("Students: " + ", ".join(email for email, _, _ in STUDENTS))
         print(f"Teacher: {TEACHER_EMAIL}; password for every account: {SEED_PASSWORD}")

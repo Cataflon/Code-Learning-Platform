@@ -8,7 +8,10 @@ import AppLayout from "./components/AppLayout.jsx";
 import AssignmentPage from "./pages/AssignmentPage.jsx";
 import CoursesPage from "./pages/CoursesPage.jsx";
 import CoursePage from "./pages/CoursePage.jsx";
+import Learn from "./pages/Learn.jsx";
+import LearnCourse from "./pages/LearnCourse.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
+import MaterialViewer from "./pages/MaterialViewer.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
 import ConceptReport from "./pages/ConceptReport.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
@@ -17,6 +20,8 @@ import StatusPage from "./pages/StatusPage.jsx";
 import StudentDashboard from "./pages/StudentDashboard.jsx";
 import AssignmentEditor from "./pages/teacher/AssignmentEditor.jsx";
 import ClassConceptReport from "./pages/teacher/ClassConceptReport.jsx";
+import MaterialsPage from "./pages/teacher/MaterialsPage.jsx";
+import StudyMaterialsEditor from "./pages/teacher/StudyMaterialsEditor.jsx";
 import SubmissionsPage from "./pages/teacher/SubmissionsPage.jsx";
 import TeacherCoursesPage from "./pages/teacher/TeacherCoursesPage.jsx";
 
@@ -45,14 +50,19 @@ export function AppRoutes() {
             element={<ByRole student={<CoursesPage />} teacher={<TeacherCoursesPage />} />}
           />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/learn/materials/:materialId" element={<MaterialViewer />} />
           <Route element={<ProtectedRoute roles={["student"]} />}>
             <Route path="/dashboard" element={<StudentDashboard />} />
             <Route path="/assignments/:assignmentId" element={<AssignmentPage />} />
             <Route path="/report" element={<ConceptReport />} />
+            <Route path="/learn" element={<Learn />} />
+            <Route path="/learn/courses/:courseId" element={<LearnCourse />} />
           </Route>
           <Route element={<ProtectedRoute roles={["teacher"]} />}>
             <Route path="/courses/:courseId" element={<CoursePage />} />
             <Route path="/courses/:courseId/report" element={<ClassConceptReport />} />
+            <Route path="/courses/:courseId/materials" element={<MaterialsPage />} />
+            <Route path="/teacher/assignments/:assignmentId/materials" element={<StudyMaterialsEditor />} />
             <Route path="/teacher/assignments/:assignmentId/edit" element={<AssignmentEditor />} />
             <Route
               path="/teacher/assignments/:assignmentId/submissions"
