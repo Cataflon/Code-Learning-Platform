@@ -122,7 +122,7 @@ test("the button waits for a task statement", () => {
   renderApp(<AiGeneratePanel assignmentId={3} hasStatement={false} />, { user: TEACHER });
 
   expect(screen.getByRole("button", { name: "Generate tests with AI" })).toBeDisabled();
-  expect(screen.getByText(/Save a task statement first/)).toBeInTheDocument();
+  expect(screen.getByText(/Write the problem statement first/)).toBeInTheDocument();
 });
 
 test("a failed job shows its reason", async () => {
@@ -227,4 +227,53 @@ test("the editor keeps drafts out of the form, so saving never deletes them", as
 
   await waitFor(() => expect(calls.some((call) => call.method === "PATCH" && call.path === "/test-cases/1")).toBe(true));
   expect(calls.some((call) => call.method === "DELETE")).toBe(false);
+});
+
+test("a statement typed but not saved yet is enough: Generate saves the details first", async () => {
+  const fresh = {
+    id: 3,
+    course_id: 1,
+    course_title: "Procedural Programming",
+    title: "Find the odd one",
+    description: "",
+    due_at: null,
+    time_limit_ms: 2000,
+    memory_limit_mb: 128,
+    max_submissions: 10,
+    is_published: false,
+    status: "draft",
+    test_count: 0,
+    hidden_test_count: 0,
+    draft_test_count: 0,
+  };
+  let saved = fresh;
+  const { calls } = mockApi({
+    "GET /assignments/3": () => saved,
+    "GET /assignments/3/test-cases": [],
+    "GET /courses/1/concepts": [],
+    "GET /config": { ai_available: true },
+    "PATCH /assignments/3": ({ body }) => (saved = { ...fresh, ...JSON.parse(body) }),
+    "POST /assignments/3/generate-tests": [202, { job_id: 4 }],
+    "GET /generation-jobs/4": job({ status: "done", phase: "done", tests_proposed: 5, tests_kept: 5 }),
+  });
+  const user = userEvent.setup();
+  renderApp(
+    <Routes>
+      <Route path="/teacher/assignments/:assignmentId/edit" element={<AssignmentEditor />} />
+    </Routes>,
+    { route: "/teacher/assignments/3/edit", user: TEACHER },
+  );
+
+  const generate = await screen.findByRole("button", { name: "Generate tests with AI" });
+  expect(generate).toBeDisabled();
+  await user.type(screen.getByLabelText("Problem, in Markdown"), "Find the least used letter.");
+  expect(generate).toBeEnabled();
+  await user.click(generate);
+
+  await waitFor(() => expect(calls.some((call) => call.path === "/assignments/3/generate-tests")).toBe(true));
+  const order = calls.filter((call) => call.method !== "GET").map((call) => `${call.method} ${call.path}`);
+  expect(order).toEqual(["PATCH /assignments/3", "POST /assignments/3/generate-tests"]);
+  const patch = calls.find((call) => call.method === "PATCH");
+  expect(JSON.parse(patch.body).description).toBe("Find the least used letter.");
+  expect(screen.getByLabelText("Problem, in Markdown")).toHaveValue("Find the least used letter.");
 });
