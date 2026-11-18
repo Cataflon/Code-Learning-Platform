@@ -3,7 +3,9 @@ import { Pencil, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { reindexMaterial } from "../../api/ai.js";
 import { deleteMaterial, updateMaterial, uploadMaterial, viewerLink } from "../../api/materials.js";
+import { useAiConfig } from "../../components/AiTests.jsx";
 import { FileBadge } from "../../components/MaterialBits.jsx";
 import { EmptyState, ErrorState, LoadingState } from "../../components/states.jsx";
 import { Button, Card, CardHeader, Chip, FormError, PageHeader, TextField } from "../../components/ui.jsx";
@@ -167,6 +169,8 @@ function MaterialRow({ material, courseId }) {
     },
   });
   const remove = useMutation({ mutationFn: () => deleteMaterial(material.id), onSuccess: refresh });
+  const reindex = useMutation({ mutationFn: () => reindexMaterial(material.id), onSuccess: refresh });
+  const ai = useAiConfig();
 
   function confirmDelete() {
     const linked = material.used_in.length
@@ -218,6 +222,14 @@ function MaterialRow({ material, courseId }) {
             </span>
           )}
         </span>
+        {ai.data?.ai_available && material.text_pages === 0 && (
+          <span className="mt-2 flex flex-wrap items-center gap-2">
+            <Chip tone="warn">No text found, link pages manually</Chip>
+            <Button variant="ghost" size="sm" onClick={() => reindex.mutate()} disabled={reindex.isPending}>
+              {reindex.isPending ? "Reading…" : "Read the text again"}
+            </Button>
+          </span>
+        )}
         {(save.isError || remove.isError) && (
           <div className="mt-2">
             <FormError>{(save.error ?? remove.error).message}</FormError>
