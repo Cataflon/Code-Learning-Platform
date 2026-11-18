@@ -291,10 +291,11 @@ function ConceptsCard({ courseId }) {
   );
 }
 
-/** Sections of a course for its teacher. Materials joins them in Step 8. */
+/** Sections of a course for its teacher. */
 export function CourseTabs({ courseId, current }) {
   const tabs = [
     { key: "assignments", label: "Assignments", to: `/courses/${courseId}` },
+    { key: "materials", label: "Materials", to: `/courses/${courseId}/materials` },
     { key: "report", label: "Concept report", to: `/courses/${courseId}/report` },
   ];
   return (

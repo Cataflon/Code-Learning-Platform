@@ -1322,6 +1322,319 @@ a.row:hover {
   }
 }
 
+
+/* ---------- materials: study list, Learn, course page, viewer (prototype values) ---------- */
+.mat {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 24px;
+  border-top: 2px dashed rgba(255, 255, 255, 0.07);
+  transition: background 0.2s;
+}
+.mat:first-child {
+  border-top: 0;
+}
+.mat:hover {
+  background: rgba(245, 184, 77, 0.07);
+}
+.mat b {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+}
+.mat small {
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+.mat .go {
+  font-size: 14px;
+  color: var(--ink-3);
+  transition: transform 0.1s steps(2), color 0.2s;
+}
+.mat:hover .go {
+  color: var(--warn);
+  transform: translateX(4px);
+}
+.pages {
+  color: var(--warn);
+  font-weight: 500;
+}
+.courses {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.course {
+  display: flex;
+  flex-direction: column;
+}
+.cover {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-bottom: 1px solid color-mix(in srgb, var(--tint) 30%, var(--edge));
+}
+.cover svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  transition: transform 0.2s steps(2);
+}
+.course:hover .cover svg,
+.c-hero:hover .cover svg {
+  transform: scale(1.04);
+}
+.course .cover .chip {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  --b: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+.course .body {
+  display: grid;
+  gap: 10px;
+  padding: 18px 20px 20px;
+}
+.course h3 {
+  font: 400 13px/1.6 var(--display);
+  color: var(--ink);
+}
+.course:hover h3 {
+  color: color-mix(in srgb, var(--tint) 55%, #fff);
+}
+.course .meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+.reco {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 20px;
+}
+.reco p {
+  flex: 1 1 300px;
+  min-width: 0;
+}
+.reco b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.c-hero {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  align-items: stretch;
+}
+.c-hero .cover {
+  aspect-ratio: auto;
+  min-height: 150px;
+  border-bottom: 0;
+  border-right: 1px solid color-mix(in srgb, var(--tint) 30%, var(--edge));
+}
+.c-hero h1 {
+  font-size: clamp(20px, 2.6vw, 30px);
+}
+.lessons {
+  display: grid;
+  gap: 12px;
+}
+.lesson {
+  display: grid;
+  grid-template-columns: 36px 46px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+}
+.lesson .no {
+  font: 400 15px/1 var(--display);
+  color: color-mix(in srgb, var(--tint) 60%, #fff);
+  text-align: center;
+}
+.lesson b {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 17px;
+}
+.lesson small {
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+.lesson.rec {
+  --tint: var(--warn);
+}
+.reader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px;
+  align-items: start;
+}
+.v-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.v-bar .pg {
+  min-width: 74px;
+  text-align: center;
+  font: 400 22px/1 var(--term);
+  color: var(--ink);
+}
+.stage {
+  display: grid;
+  place-items: center;
+  padding: 26px;
+  background: rgba(0, 0, 0, 0.4);
+  min-height: 320px;
+}
+.sheet {
+  --b: #d8d4f5;
+  --px: 4px;
+  box-shadow:
+    0 -4px 0 0 var(--b),
+    0 4px 0 0 var(--b),
+    -4px 0 0 0 var(--b),
+    4px 0 0 0 var(--b),
+    12px 12px 0 0 rgba(0, 0, 0, 0.6);
+  margin: 4px;
+  background: #fbfbfe;
+  max-width: 100%;
+}
+.sheet canvas {
+  display: block;
+  max-width: 100%;
+  height: auto !important;
+}
+.thumbs {
+  display: flex;
+  gap: 10px;
+  padding: 14px 18px;
+  overflow-x: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.thumbs button {
+  --b: var(--edge);
+  --px: 2px;
+  flex: none;
+  width: 34px;
+  height: 30px;
+  margin: 2px;
+  background: var(--card-2);
+  color: var(--ink-3);
+  font: 400 18px/1 var(--term);
+  box-shadow:
+    0 -2px 0 0 var(--b),
+    0 2px 0 0 var(--b),
+    -2px 0 0 0 var(--b),
+    2px 0 0 0 var(--b);
+  transition: transform 0.1s steps(2);
+}
+.thumbs button:hover {
+  transform: translateY(-4px);
+  color: var(--ink);
+}
+.thumbs button.rec {
+  --b: #b07b1c;
+  background: #3a2a0d;
+  color: var(--warn);
+}
+.thumbs button.cur {
+  --b: #fff;
+  background: var(--accent);
+  color: #fff;
+}
+.info {
+  display: grid;
+  padding: 6px 0;
+}
+.info div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 20px;
+  font-size: 14px;
+}
+.info dt {
+  color: var(--ink-3);
+}
+.info dd {
+  color: var(--ink);
+  font-weight: 500;
+  text-align: right;
+}
+.dropzone {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: 28px 20px;
+  text-align: center;
+  border: 2px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.dropzone.over {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: var(--accent-strong);
+}
+
+@media (max-width: 960px) {
+  .courses {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .reader {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lesson {
+    grid-template-columns: 36px 46px minmax(0, 1fr) auto;
+  }
+  .lesson .extra {
+    grid-column: 3 / -1;
+    grid-row: 2;
+  }
+}
+@media (max-width: 640px) {
+  .courses {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .c-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .c-hero .cover {
+    min-height: 120px;
+    border-right: 0;
+    border-bottom: 1px solid var(--edge);
+  }
+  .lesson {
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    gap: 10px 12px;
+    padding: 14px 16px;
+  }
+  .lesson .ext {
+    display: none;
+  }
+  .lesson .extra {
+    grid-column: 2 / -1;
+  }
+  .mat {
+    padding-inline: 18px;
+  }
+  .stage {
+    padding: 14px;
+  }
+  .v-bar .dl {
+    display: none;
+  }
+}
+
 /* No motion at all for people who asked for it (the background is drawn once, static). */
 @media (prefers-reduced-motion: reduce) {
   *,
