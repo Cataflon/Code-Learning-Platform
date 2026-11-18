@@ -48,12 +48,12 @@ def completion(content, finish_reason="stop"):
             SimpleNamespace(finish_reason=finish_reason, message=SimpleNamespace(content=content))
         ],
         usage=SimpleNamespace(prompt_tokens=120, completion_tokens=45),
-        model="meta/llama-3.3-70b-instruct",
+        model="qwen/qwen3-next-80b-a3b-instruct",
     )
 
 
 def nvidia_with(outcome):
-    client = NvidiaClient("test-key", "meta/llama-3.3-70b-instruct", "http://unused", 5)
+    client = NvidiaClient("test-key", "qwen/qwen3-next-80b-a3b-instruct", "http://unused", 5)
     completions = ScriptedCompletions(outcome)
     client.client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
     return client, completions

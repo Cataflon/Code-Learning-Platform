@@ -120,7 +120,7 @@ def parse_json_object(text: str) -> dict[str, Any]:
 
 
 class NvidiaClient:
-    """A model of the NVIDIA API catalog (default ``meta/llama-3.3-70b-instruct``).
+    """A model of the NVIDIA API catalog (default ``qwen/qwen3-next-80b-a3b-instruct``).
 
     The hosted endpoint is OpenAI-compatible, so the official ``openai`` SDK is used with
     NVIDIA's base URL. Its documented request has no JSON-schema field, so the schema goes
