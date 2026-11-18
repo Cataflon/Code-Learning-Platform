@@ -111,6 +111,7 @@ class TestCaseRead(BaseModel):
     review_status: str = "approved"
     generation_job_id: int | None = None
     ai_rationale: str | None = None
+    ai_check_output: str | None = None
     # Where to study when this test fails (Step 8); teacher view only.
     materials: list[MaterialLinkRead] = []
 

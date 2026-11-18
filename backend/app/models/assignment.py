@@ -118,6 +118,9 @@ class TestCase(Base):
         ForeignKey("generation_jobs.id", ondelete="SET NULL"), nullable=True
     )
     ai_rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # When the AI wrote the solution, a second independent solution runs too; if it printed
+    # something else on this input, its output is kept here so the teacher can decide.
+    ai_check_output: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     assignment: Mapped[Assignment] = relationship(back_populates="test_cases")
     concepts: Mapped[list[Concept]] = relationship(

@@ -66,9 +66,8 @@ test("the panel starts a job, follows its phases and reports the result", async 
   });
 
   const button = screen.getByRole("button", { name: "Generate tests with AI" });
-  expect(button).toBeDisabled(); // no reference solution yet
   await user.selectOptions(screen.getByLabelText("Number of tests to generate"), "10");
-  await user.type(screen.getByLabelText("Your reference solution"), "print(10)");
+  await user.type(screen.getByLabelText("Your reference solution (optional)"), "print(10)");
   await user.click(button);
 
   expect(await screen.findByText("Proposing test inputs…")).toBeInTheDocument();
@@ -76,6 +75,47 @@ test("the panel starts a job, follows its phases and reports the result", async 
   expect(onFinished).toHaveBeenCalledTimes(1);
   const post = calls.find((call) => call.method === "POST");
   expect(JSON.parse(post.body)).toEqual({ count: 10, reference_solution: "print(10)" });
+});
+
+test("without a solution the AI writes it, and the panel says so", async () => {
+  const states = [job({ phase: "writing", reference_by: "ai" })];
+  const { calls } = mockApi({
+    "POST /assignments/3/generate-tests": [202, { job_id: 4 }],
+    "GET /generation-jobs/4": () =>
+      states.shift() ?? job({ status: "done", phase: "done", reference_by: "ai", tests_proposed: 8, tests_kept: 8 }),
+  });
+  const user = userEvent.setup();
+  renderApp(<AiGeneratePanel assignmentId={3} hasStatement interval={20} />, { user: TEACHER });
+
+  await user.click(screen.getByRole("button", { name: "Generate tests with AI" }));
+
+  expect(await screen.findByText("Writing the solution and the tests…")).toBeInTheDocument();
+  expect(await screen.findByText(/8 tests ready for review/)).toBeInTheDocument();
+  const post = calls.find((call) => call.method === "POST");
+  expect(JSON.parse(post.body)).toEqual({ count: 8, reference_solution: "" });
+});
+
+test("a draft where the two AI solutions disagree is flagged, with both solutions shown", async () => {
+  mockApi({
+    "GET /generation-jobs/4": job({
+      status: "done",
+      phase: "done",
+      reference_by: "ai",
+      reference_code: "print(11)",
+      check_code: "print(-11)",
+    }),
+  });
+  renderApp(
+    <DraftsPanel assignmentId={3} drafts={[draft(7, { expected_output: "11\n", ai_check_output: "-11\n" }), draft(8)]} onChanged={vi.fn()} />,
+    { user: TEACHER },
+  );
+
+  const flagged = screen.getByRole("listitem", { name: "Draft 1: Draft 7" });
+  expect(within(flagged).getByText("solutions disagree")).toBeInTheDocument();
+  expect(within(flagged).getByText(/The second AI solution printed instead/)).toBeInTheDocument();
+  expect(within(screen.getByRole("listitem", { name: "Draft 2: Draft 8" })).queryByText("solutions disagree")).toBeNull();
+  expect(await screen.findByText(/Solution written by the AI: check it before approving/)).toBeInTheDocument();
+  expect(screen.getByText("print(-11)")).toBeInTheDocument();
 });
 
 test("the button waits for a task statement", () => {
@@ -93,7 +133,7 @@ test("a failed job shows its reason", async () => {
   const user = userEvent.setup();
   renderApp(<AiGeneratePanel assignmentId={3} hasStatement interval={20} />, { user: TEACHER });
 
-  await user.type(screen.getByLabelText("Your reference solution"), "import random");
+  await user.type(screen.getByLabelText("Your reference solution (optional)"), "import random");
   await user.click(screen.getByRole("button", { name: "Generate tests with AI" }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent("not deterministic");
@@ -131,7 +171,7 @@ test("drafts can be approved one by one or all at once, and show the reference s
     "/learn/materials/5?page=12&rec=12-15",
   );
   expect(within(screen.getByRole("listitem", { name: "Draft 2: Draft 8" })).getByText("no concept")).toBeInTheDocument();
-  expect(await screen.findByText(/Reference solution used/)).toBeInTheDocument();
+  expect(await screen.findByText(/Your reference solution/)).toBeInTheDocument();
 
   await user.click(within(first).getByRole("button", { name: "Approve" }));
   await user.click(screen.getByRole("button", { name: "Approve all" }));
@@ -179,8 +219,6 @@ test("the editor keeps drafts out of the form, so saving never deletes them", as
   );
 
   expect(await screen.findByText("1 AI tests still need review")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Generate tests with AI" })).toBeDisabled();
-  await user.type(screen.getByLabelText("Your reference solution"), "print(1)");
   expect(screen.getByRole("button", { name: "Generate tests with AI" })).toBeEnabled();
   expect(screen.getByDisplayValue("Manual")).toBeInTheDocument();
   expect(screen.queryByDisplayValue("AI one")).not.toBeInTheDocument(); // not a form row

@@ -88,12 +88,16 @@ def db_session(engine: Engine) -> Iterator[Session]:
 
 @pytest.fixture(autouse=True)
 def no_real_ai_key(monkeypatch):
-    """Tests never see a real NVIDIA or Anthropic key, even if the developer's .env has one."""
+    """Tests never see a real AI key or model choice, even if the developer's .env has them."""
     from pydantic import SecretStr
 
-    monkeypatch.setattr(get_settings(), "nvidia_api_key", SecretStr(""))
-    monkeypatch.setattr(get_settings(), "anthropic_api_key", SecretStr(""))
-    monkeypatch.setattr(get_settings(), "ai_provider", "nvidia")
+    settings = get_settings()
+    for name in ("gemini_api_key", "nvidia_api_key", "anthropic_api_key"):
+        monkeypatch.setattr(settings, name, SecretStr(""))
+    monkeypatch.setattr(settings, "ai_provider", "gemini")
+    for name in ("ai_model", "ai_fallback_models", "ai_base_url"):
+        monkeypatch.setattr(settings, name, "")
+    monkeypatch.setattr(settings, "ai_timeout_s", 0)
     monkeypatch.setattr(get_settings(), "ai_enabled", True)
 
 

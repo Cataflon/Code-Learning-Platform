@@ -1,9 +1,15 @@
 """Tests generated with AI and linked automatically to course materials (Step 9).
 
-The main rule (decision D26): the model writes no code and no expected output. The
-teacher gives the reference solution, the model proposes test inputs, the solution runs in
-the sandbox on every input, and what it prints becomes ``expected_output``. Every generated
-test starts as a draft (D28) and counts only after the teacher approves it.
+The main rule (decision D26): the model never writes an expected output. A reference solution
+runs in the sandbox on every input, and what it prints becomes ``expected_output``.
+
+* When the teacher pastes the solution, the model only proposes the inputs.
+* When the teacher writes only the statement, the model writes the solution and the inputs,
+  then, in a separate request, a second independent solution. The first solution must pass
+  the examples of the statement; on every input both solutions run, and a test where they
+  disagree keeps the second output (``ai_check_output``) so the teacher sees it.
+
+Every generated test starts as a draft (D28) and counts only after the teacher approves it.
 """
 
 import logging
@@ -19,7 +25,13 @@ from sqlalchemy.orm import Session
 
 from app.ai import prompts
 from app.ai.client import InvalidJSONError, LLMClient, LLMError
-from app.ai.schemas import GenerationResult, MaterialChoice
+from app.ai.schemas import (
+    AuthoredResult,
+    CheckSolution,
+    GenerationResult,
+    LinkChoices,
+    StatementExample,
+)
 from app.core.config import get_settings
 from app.core.errors import (
     ConflictError,
@@ -41,6 +53,7 @@ from app.models import (
     User,
 )
 from app.runner.base import Limits, Runner
+from app.runner.compare import outputs_match
 from app.services.pages import PagesError, format_pages, parse_pages
 
 logger = logging.getLogger(__name__)
@@ -69,8 +82,7 @@ def start_generation(
     ensure_available()
     if not assignment.description.strip():
         raise InvalidDataError("Write the task statement before generating tests")
-    if not reference_solution.strip():
-        raise InvalidDataError("Paste your reference solution: it computes the expected outputs")
+    by_teacher = bool(reference_solution.strip())
     active = db.scalar(
         select(GenerationJob.id).where(
             GenerationJob.assignment_id == assignment.id, GenerationJob.status.in_(ACTIVE)
@@ -95,9 +107,10 @@ def start_generation(
     job = GenerationJob(
         assignment_id=assignment.id,
         requested_by=teacher.id,
-        model=get_settings().ai_model,
+        model=get_settings().ai_models[0][:64],
         tests_requested=count,
-        reference_code=reference_solution,
+        reference_code=reference_solution if by_teacher else None,
+        reference_by="teacher" if by_teacher else "ai",
         created_at=datetime.now(UTC),
     )
     db.add(job)
@@ -187,6 +200,8 @@ def _ask[T: BaseModel](
             continue
         job.input_tokens += result.input_tokens
         job.output_tokens += result.output_tokens
+        if result.model:
+            job.model = result.model[:64]  # a fallback model may have answered
         try:
             return model.model_validate(result.data)
         except ValidationError:
@@ -202,6 +217,22 @@ def normalize_name(name: str) -> str:
     return " ".join(plain.casefold().split())
 
 
+def _flat(value: str) -> str:
+    return " ".join(value.split())
+
+
+def _clean(run) -> bool:
+    return not (run.timed_out or run.memory_exceeded or run.exit_code != 0)
+
+
+def _verdict_of(run) -> str:
+    if run.timed_out:
+        return "time limit exceeded"
+    if run.memory_exceeded:
+        return "memory limit exceeded"
+    return "runtime error"
+
+
 def generate_tests(
     db: Session,
     job: GenerationJob,
@@ -212,44 +243,92 @@ def generate_tests(
     assignment = job.assignment
     concepts = list(db.scalars(select(Concept).where(Concept.course_id == assignment.course_id)))
     by_name = {normalize_name(concept.name): concept for concept in concepts}
+    concept_names = [concept.name for concept in concepts]
+    limits_args = (assignment.time_limit_ms, assignment.memory_limit_mb)
 
-    # 1. The model proposes test inputs for the teacher's solution (no code, no outputs).
-    result = _ask(
-        llm,
-        job,
-        prompts.GENERATION_SYSTEM,
-        prompts.generation_prompt(
-            assignment.description,
-            job.reference_code,
-            assignment.time_limit_ms,
-            assignment.memory_limit_mb,
-            [concept.name for concept in concepts],
-            job.tests_requested,
-        ),
-        prompts.GENERATION_SCHEMA,
-        GenerationResult,
-    )
-    job.tests_proposed = len(result.tests)
+    # 1. The model proposes the inputs; it writes the solution too when the teacher gave none.
+    examples: list[StatementExample] = []
+    if job.reference_by == "ai":
+        authored = _ask(
+            llm,
+            job,
+            prompts.AUTHOR_SYSTEM,
+            prompts.author_prompt(
+                assignment.description, *limits_args, concept_names, job.tests_requested
+            ),
+            prompts.AUTHOR_SCHEMA,
+            AuthoredResult,
+        )
+        job.reference_code = authored.reference_solution
+        tests = authored.tests
+        # Only examples really written in the statement count (the model may not invent one).
+        statement = _flat(assignment.description)
+        examples = [
+            example
+            for example in authored.examples
+            if _flat(example.input) in statement and _flat(example.output) in statement
+        ]
+        # A second solution, written without seeing the first, cross-checks it.
+        check = _ask(
+            llm,
+            job,
+            prompts.CHECK_SYSTEM,
+            prompts.check_prompt(assignment.description, *limits_args),
+            prompts.CHECK_SCHEMA,
+            CheckSolution,
+        )
+        job.check_code = check.solution
+    else:
+        result = _ask(
+            llm,
+            job,
+            prompts.GENERATION_SYSTEM,
+            prompts.generation_prompt(
+                assignment.description,
+                job.reference_code,
+                *limits_args,
+                concept_names,
+                job.tests_requested,
+            ),
+            prompts.GENERATION_SCHEMA,
+            GenerationResult,
+        )
+        tests = result.tests
+    job.tests_proposed = len(tests)
     db.commit()
 
     # 2. The sandbox runs the solution on every input; its output is the expected output.
-    limits = Limits(
-        time_limit_ms=assignment.time_limit_ms, memory_limit_mb=assignment.memory_limit_mb
-    )
-    kept: list[tuple[int, str]] = []
+    limits = Limits(time_limit_ms=limits_args[0], memory_limit_mb=limits_args[1])
+    solution = job.reference_code
+    kept: list[tuple[int, str, str | None]] = []
     with slots:
-        for index, test in enumerate(result.tests):
-            run = runner.run(job.reference_code, test.input, limits)
+        for example in examples:
+            run = runner.run(solution, example.input, limits)
+            if not _clean(run) or not outputs_match(run.stdout, example.output):
+                shown = _flat(example.input)[:60]
+                raise GenerationError(
+                    "The solution written by the AI fails the example in the task statement "
+                    f"(input “{shown}”). Make the statement clearer or paste your own solution."
+                )
+        for index, test in enumerate(tests):
+            run = runner.run(solution, test.input, limits)
             if index == 0:
-                again = runner.run(job.reference_code, test.input, limits)
+                again = runner.run(solution, test.input, limits)
                 if again.stdout != run.stdout:
                     raise GenerationError(
                         "The reference solution is not deterministic: two runs on the same "
                         "input printed different outputs"
                     )
-            if run.timed_out or run.memory_exceeded or run.exit_code != 0:
+            if not _clean(run):
                 continue  # an input the solution cannot handle is not a test
-            kept.append((index, run.stdout))
+            disagreement = None
+            if job.check_code:
+                other = runner.run(job.check_code, test.input, limits)
+                if not _clean(other):
+                    disagreement = f"(the second solution stopped: {_verdict_of(other)})"
+                elif not outputs_match(other.stdout, run.stdout):
+                    disagreement = other.stdout
+            kept.append((index, run.stdout, disagreement))
     job.tests_kept = len(kept)
     if not kept:
         raise GenerationError("The reference solution failed on every generated input")
@@ -260,8 +339,8 @@ def generate_tests(
     )
     position = -1 if last is None else last
     created = []
-    for index, output in kept:
-        test = result.tests[index]
+    for index, output, disagreement in kept:
+        test = tests[index]
         position += 1
         matched = []
         for name in test.concepts:
@@ -280,15 +359,15 @@ def generate_tests(
             review_status=ReviewStatus.draft,
             generation_job_id=job.id,
             ai_rationale=test.rationale or None,
+            ai_check_output=disagreement,
             concepts=matched,
         )
         db.add(test_case)
         created.append(test_case)
     db.commit()
 
-    # 4. Propose a material and pages for each test (when the course has indexed text).
-    for test_case in created:
-        link_materials(db, job, test_case, llm)
+    # 4. Propose a material and pages for every test, in one request.
+    link_materials(db, job, created, llm)
     db.commit()
     return created
 
@@ -342,39 +421,81 @@ def find_candidates(db: Session, course_id: int, terms: list[str]) -> list[dict]
     ]
 
 
-def link_materials(db: Session, job: GenerationJob, test_case: TestCase, llm: LLMClient) -> bool:
-    """Ask the model which candidate page explains the test; keep it only if it checks out."""
-    assignment = test_case.assignment
-    concepts = [concept.name for concept in test_case.concepts]
-    terms = search_terms(
-        " ".join(concepts), test_case.ai_rationale or "", test_case.name, assignment.description
-    )
-    candidates = find_candidates(db, assignment.course_id, terms)
+def _merge_candidates(per_test: list[list[dict]], limit: int) -> list[dict]:
+    """The best pages of every test, taken in turns, so each test keeps its top pages."""
+    merged: dict[tuple[int, int], dict] = {}
+    depth = max((len(pages) for pages in per_test), default=0)
+    for rank in range(depth):
+        for pages in per_test:
+            if rank < len(pages) and len(merged) < limit:
+                page = pages[rank]
+                merged.setdefault((page["material_id"], page["page_no"]), page)
+    return list(merged.values())
+
+
+def link_materials(
+    db: Session, job: GenerationJob, test_cases: list[TestCase], llm: LLMClient
+) -> int:
+    """Ask once which candidate pages explain each test; keep only proposals that check out."""
+    if not test_cases:
+        return 0
+    assignment = test_cases[0].assignment
+    per_test = []
+    for test_case in test_cases:
+        concepts = [concept.name for concept in test_case.concepts]
+        terms = search_terms(
+            " ".join(concepts), test_case.ai_rationale or "", test_case.name, assignment.description
+        )
+        per_test.append(find_candidates(db, assignment.course_id, terms))
+    candidates = _merge_candidates(per_test, prompts.MAX_LINK_PAGES)
     if not candidates:
-        return False  # the assignment's materials apply instead (rule from Step 8)
-    choice = _ask(
+        return 0  # the materials of the assignment apply instead (rule from Step 8)
+    described = [
+        {
+            "name": test_case.name,
+            "concepts": [concept.name for concept in test_case.concepts],
+            "rationale": test_case.ai_rationale or "",
+        }
+        for test_case in test_cases
+    ]
+    choices = _ask(
         llm,
         job,
         prompts.LINK_SYSTEM,
-        prompts.link_prompt(test_case.name, concepts, test_case.ai_rationale or "", candidates),
+        prompts.link_prompt(described, candidates),
         prompts.LINK_SCHEMA,
-        MaterialChoice,
+        LinkChoices,
     )
-    if choice.material_id is None:
-        return False
-    material = db.get(Material, choice.material_id)
-    # Only a material of this course that was among the candidates, with pages that exist.
-    if material is None or material.course_id != assignment.course_id:
-        return False
-    if choice.material_id not in {candidate["material_id"] for candidate in candidates}:
-        return False
-    try:
-        pages = format_pages(parse_pages(choice.pages, material.page_count))
-    except PagesError:
-        return False
-    if db.get(TestCaseMaterial, (test_case.id, material.id)) is None:
-        db.add(TestCaseMaterial(test_case_id=test_case.id, material_id=material.id, pages=pages))
-    return True
+    # Pages the search found, plus their neighbours: a proposal may not go beyond them.
+    near: dict[int, set[int]] = {}
+    for candidate in candidates:
+        page = candidate["page_no"]
+        near.setdefault(candidate["material_id"], set()).update((page - 1, page, page + 1))
+    linked: set[int] = set()
+    for choice in choices.links:
+        if not 0 <= choice.test < len(test_cases) or choice.test in linked:
+            continue
+        if choice.material_id is None or choice.material_id not in near:
+            continue
+        material = db.get(Material, choice.material_id)
+        # Only a material of this course that was among the candidates, with pages that exist.
+        if material is None or material.course_id != assignment.course_id:
+            continue
+        try:
+            ranges = parse_pages(choice.pages, material.page_count)
+        except PagesError:
+            continue
+        chosen = {page for start, end in ranges for page in range(start, end + 1)}
+        if not chosen or not chosen <= near[material.id]:
+            continue  # the whole material, or pages the search never found
+        pages = format_pages(ranges)
+        test_case = test_cases[choice.test]
+        if db.get(TestCaseMaterial, (test_case.id, material.id)) is None:
+            db.add(
+                TestCaseMaterial(test_case_id=test_case.id, material_id=material.id, pages=pages)
+            )
+        linked.add(choice.test)
+    return len(linked)
 
 
 # --- review ----------------------------------------------------------------------------------
