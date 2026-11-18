@@ -1,0 +1,56 @@
+@startuml secventa-generare-teste
+title 7e. Generarea testelor cu Claude (Pasul 9)
+autonumber
+
+actor Profesor as T
+participant "Browser\n(AssignmentEditor)" as B
+participant "Router\n/api/v1/ai" as R
+participant "AIService" as S
+database "PostgreSQL" as DB
+participant "LLMClient\n(ClaudeClient)" as L
+participant "Claude API" as C
+participant "Runner\n(DockerRunner)" as D
+
+T -> B : Generate tests with AI (count)
+B -> R : POST /assignments/{id}/generate-tests
+R -> S : start_generation()
+S -> DB : verifică: un singur job activ, limita pe oră, enunț
+S -> DB : INSERT generation_jobs (queued)
+R --> B : 202 {job_id}
+R ->> S : run_generation(job_id) în fundal, sesiune proprie
+
+loop polling la 2 s
+  B -> R : GET /generation-jobs/{id}
+  R --> B : status + fază
+end
+
+S -> DB : status = running
+S -> L : complete_json(enunț, limite, concepte)
+L -> C : messages (structured output, fallbacks)
+C --> L : reference_solution + intrări (fără ieșiri)
+L --> S : JSON validat cu Pydantic
+
+loop pentru fiecare intrare
+  S -> D : run(reference_solution, input, limite)
+  D --> S : stdout / eroare / timeout
+  note right of S : expected_output = stdout\n(niciodată textul modelului)
+end
+
+S -> DB : INSERT test_cases (source=ai, review_status=draft)
+
+loop pentru fiecare test păstrat
+  S -> DB : ts_rank pe material_pages (tsvector)
+  S -> L : complete_json(test + pagini candidate)
+  L -> C : messages
+  C --> L : {material_id, pages}
+  S -> S : validează cursul și paginile
+  S -> DB : INSERT test_case_materials
+end
+
+S -> DB : status = done, tokeni
+B -> R : GET /generation-jobs/{id}
+R --> B : done, N teste de revizuit
+T -> B : Approve / Edit / Delete / Approve all
+B -> R : POST /test-cases/{id}/approve
+R -> DB : review_status = approved
+@enduml

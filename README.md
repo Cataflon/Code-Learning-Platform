@@ -42,3 +42,16 @@ Fișierele încărcate stau în `uploads/` (în afara git-ului). Pentru previzua
 instalat [LibreOffice](https://www.libreoffice.org/download/); pe Windows se găsește singur în
 `C:\Program Files\LibreOffice`, altfel se setează `SOFFICE_PATH` în `.env`. Fără LibreOffice,
 PDF-urile funcționează normal, iar un PPTX este refuzat cu un mesaj clar.
+
+## Teste generate cu AI (opțional)
+
+Profesorul poate genera testele unei teme cu Claude. Funcția apare doar dacă `backend/.env`
+conține o cheie API Anthropic:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...   # nu se pune niciodată în git
+AI_MODEL=claude-sonnet-5-5
+```
+
+Ieșirile așteptate nu vin de la model: soluția lui de referință rulează în sandbox-ul Docker.
+Testele generate sunt ciorne până când profesorul le aprobă.

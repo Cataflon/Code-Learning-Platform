@@ -288,6 +288,10 @@ def seed_materials(db: Session, store=None, converter=None) -> list[str]:
         db.add(lecture)
         db.flush()
         notes.append(f"Added '{LECTURE_TITLE}' ({pages} pages)")
+        # Index the page text so AI-generated tests can be linked to it (Step 9).
+        from app.services.material_service import extract_pages
+
+        extract_pages(db, lecture, store)
 
     if LAB_TITLE not in existing:
         try:
