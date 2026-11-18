@@ -100,7 +100,7 @@ export default function RegisterPage() {
             label="Invite code"
             value={form.invite_code}
             onChange={set("invite_code")}
-            hint="Teacher accounts need the code from the platform administrator."
+            hint="Teacher accounts need a code from the platform administrator, e.g. TEACH-4KQ7-M2XD."
             required
           />
         )}

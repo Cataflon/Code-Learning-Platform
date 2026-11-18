@@ -68,6 +68,7 @@ export function useAuth() {
 
 /** Where each role lands after signing in. */
 export function homePathFor(user) {
+  if (user?.role === "admin") return "/admin/users";
   return user?.role === "teacher" ? "/courses" : "/dashboard";
 }
 

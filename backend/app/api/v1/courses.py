@@ -75,6 +75,12 @@ def leave_course(course_id: int, db: DbSession, user: StudentUser) -> None:
     course_service.leave_course(db, user, course_service.get_course(db, course_id))
 
 
+@router.delete("/{course_id}/students/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_student(course: OwnedCourse, student_id: int, db: DbSession) -> None:
+    """The teacher takes a student out of the course; their submissions stay."""
+    course_service.remove_student(db, course, student_id)
+
+
 @router.post("/{course_id}/join-code", response_model=CourseRead)
 def new_join_code(course: OwnedCourse, db: DbSession, user: CurrentUser):
     """Generate another enrollment code; the old one stops working."""

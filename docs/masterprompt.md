@@ -276,6 +276,14 @@ Toate rutele stau sub `/api/v1`, în afară de `/health`. „Membru” înseamn�
 | `POST /test-cases/{id}/approve` | profesorul cursului | aprobă o ciornă (`review_status = approved`); 422 fără `expected_output` | 9 |
 | `POST /assignments/{id}/tests/approve-all` | profesorul cursului | aprobă toate ciornele temei | 9 |
 | `POST /materials/{id}/reindex` | profesorul cursului | reextrage textul paginilor materialului | 9 |
+| `DELETE /courses/{id}/students/{student_id}` | profesorul cursului | scoate un student din curs; trimiterile lui rămân | admin |
+| `GET /admin/stats` | admin | numărul de studenți, profesori, admini, conturi dezactivate, cursuri, teme, trimiteri, coduri active | admin |
+| `GET /admin/users?q=&role=&active=&limit=&offset=` | admin | toate conturile, cu căutare după nume sau email, filtre și numărători (cursuri, trimiteri, codul de invitație folosit) | admin |
+| `PATCH /admin/users/{id}` | admin | schimbă `role`, `is_active` sau `full_name`; 422 pe propriul cont, 409 pentru ultimul admin sau pentru un profesor care încă are cursuri | admin |
+| `POST /admin/users/{id}/reset-password` | admin | parolă temporară nouă, arătată o singură dată | admin |
+| `GET /admin/invite-codes` | admin | codurile de invitație, cu starea (`active`, `used`, `expired`, `revoked`) și cine le-a folosit | admin |
+| `POST /admin/invite-codes` | admin | cod nou `TEACH-XXXX-XXXX` (`note`, `max_uses` 1-100, `expires_in_days` sau fără expirare) | admin |
+| `POST /admin/invite-codes/{id}/revoke` | admin | revocă un cod | admin |
 | GET /submissions/{id}/recommendations | autorul sau profesorul cursului | materialele de recapitulat pentru testele picate, calculate la cerere; testele ascunse apar doar ca „Test ascuns #n” | 8 |
 
 **Forma unui răspuns de trimitere**
@@ -437,7 +445,7 @@ Documentul pornește de la valorile din coloana „Default propus”. Răspunde 
 | D2 | Baza de date | PostgreSQL de la început | SQLite în primele zile, mutare ulterioară |  |
 | D3 | Limbajul frontend-ului | JavaScript (confirmat 12.11.2026) | TypeScript | da |
 | D4 | Formatul testelor | stdin și stdout: programul citește input și afișează rezultatul | apeluri de funcții cu argumente, în stil pytest | da |
-| D5 | Cont de profesor | cod de invitație din `.env` | oricine se poate înregistra ca profesor; doar prin seed |  |
+| D5 | Cont de profesor | cod de invitație din `.env` (revizuit de D30: coduri generate de admin) | oricine se poate înregistra ca profesor; doar prin seed |  |
 | D6 | Identificatori | numere întregi autoincrement | UUID |  |
 | D7 | Token-ul în browser | JWT în `localStorage` (simplu, expus la XSS) | cookie `httpOnly` (cere protecție CSRF) |  |
 | D8 | Execuție asincronă | `BackgroundTasks` cu semafor | worker propriu cu coadă în baza de date; Celery cu Redis dacă încărcarea crește |  |
@@ -461,6 +469,7 @@ Documentul pornește de la valorile din coloana „Default propus”. Răspunde 
 | D26 | Sursa lui `expected_output` la testele generate | rularea unei soluții de referință în sandbox, niciodată textul modelului. Soluția e a profesorului dacă o lipește; altfel o scrie modelul, care trebuie să treacă exemplul din enunț și e verificată de o a doua soluție scrisă separat (testele unde diferă sunt marcate); totul rămâne ciornă până la aprobare (decis 17.11.2026, revizuit 18.11.2026) | n/a |  |
 | D27 | Căutarea paginilor candidate | full-text search PostgreSQL (`tsvector`, dicționar `simple`); fără tehnologie nouă, suficient pentru câteva sute de pagini (decis 17.11.2026) | embeddings cu pgvector |  |
 | D28 | Testele generate | ciorne până la aprobarea profesorului; evaluarea ignoră ciornele; profesorul răspunde pentru teste (decis 17.11.2026) | aprobare automată |  |
+| D30 | Administrarea conturilor | rol `admin` tehnic: vede toate conturile, schimbă rolul, dezactivează, resetează parola și generează coduri de invitație pentru profesori; nu vede conținutul cursurilor; primul admin se creează cu `python -m app.cli create-admin` (decis 19.11.2026) | adminul ca super-profesor; fără admin, doar codul din `.env` |  |
 | D29 | Disponibilitatea AI | funcție opțională: fără cheie, butonul nu apare și endpoint-urile răspund 503; aplicația merge și fără cont Claude (decis 17.11.2026) | AI obligatoriu |  |
 
 ## Pasul 0 · Fundații (săpt. 3)

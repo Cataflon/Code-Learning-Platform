@@ -45,6 +45,8 @@ def get_current_user(db: DbSession, token: Annotated[str | None, Depends(oauth2_
     user = db.get(User, user_id)
     if user is None:
         raise UnauthorizedError("This account no longer exists", headers=_BEARER)
+    if not user.is_active:
+        raise UnauthorizedError("This account has been disabled", headers=_BEARER)
     return user
 
 
@@ -62,6 +64,7 @@ def require_role(role: Role) -> Callable[[User], User]:
 
 TeacherUser = Annotated[User, Depends(require_role(Role.teacher))]
 StudentUser = Annotated[User, Depends(require_role(Role.student))]
+AdminUser = Annotated[User, Depends(require_role(Role.admin))]
 
 
 def get_course_for_member(course_id: int, db: DbSession, user: CurrentUser) -> Course:

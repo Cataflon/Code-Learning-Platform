@@ -38,6 +38,7 @@ class UserRead(BaseModel):
     email: str
     full_name: str
     role: Role
+    is_active: bool = True
     created_at: datetime
 
 

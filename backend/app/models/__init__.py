@@ -11,7 +11,7 @@ from app.models.material import (
     TestCaseMaterial,
 )
 from app.models.submission import Submission, SubmissionStatus, TestResult, Verdict
-from app.models.user import Role, User
+from app.models.user import InviteCode, Role, User
 
 __all__ = [
     "COURSE_COLORS",
@@ -22,6 +22,7 @@ __all__ = [
     "Enrollment",
     "FileType",
     "GenerationJob",
+    "InviteCode",
     "Material",
     "MaterialCategory",
     "MaterialPage",

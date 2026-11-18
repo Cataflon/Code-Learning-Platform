@@ -12,6 +12,7 @@ from app.models import Assignment, Concept, Course, Enrollment, Role, TestCase, 
 
 SEED_PASSWORD = "parola123"
 TEACHER_EMAIL = "maria.ionescu@utcluj.ro"
+ADMIN_EMAIL = "admin@utcluj.ro"
 STUDENT_EMAILS = ("andrei.pop@student.utcluj.ro", "elena.matei@student.utcluj.ro")
 COURSE_TITLE = "Procedural Programming"
 JOIN_CODE = "PP4K7MAB"
@@ -34,6 +35,7 @@ def get_or_create_user(db: Session, email: str, full_name: str, role: Role) -> U
 
 
 def seed(db: Session) -> Course:
+    get_or_create_user(db, ADMIN_EMAIL, "Technical Admin", Role.admin)
     teacher = get_or_create_user(db, TEACHER_EMAIL, "Dr. Maria Ionescu", Role.teacher)
     students = [
         get_or_create_user(db, STUDENT_EMAILS[0], "Andrei Pop", Role.student),
@@ -113,6 +115,7 @@ def main() -> None:
         course = seed(db)
         print(f"Seed ready: course '{course.title}', join code {course.join_code}")
         print(f"Teacher: {TEACHER_EMAIL} / students: {', '.join(STUDENT_EMAILS)}")
+        print(f"Admin: {ADMIN_EMAIL}")
         print(f"Password for all seeded accounts: {SEED_PASSWORD}")
 
 

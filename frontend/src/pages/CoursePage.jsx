@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Clock, Copy, FlaskConical, List, Plus, Ticket } from "lucide-react";
+import { Check, Clock, Copy, FlaskConical, List, Plus, Ticket, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { createAssignment, updateAssignment } from "../api/assignments.js";
+import { createAssignment, deleteAssignment, updateAssignment } from "../api/assignments.js";
 import { createConcept, listConcepts, newJoinCode } from "../api/courses.js";
 import { getCourseStats } from "../api/dashboard.js";
+import { CourseSettingsCard, StudentsCard } from "../components/CourseSettings.jsx";
 import { EmptyState, ErrorState, LoadingState } from "../components/states.jsx";
 import {
   Button,
@@ -79,6 +80,7 @@ function AssignmentsCard({ courseId }) {
     mutationFn: (assignmentId) => updateAssignment(assignmentId, { is_published: true }),
     onSuccess: refresh,
   });
+  const remove = useMutation({ mutationFn: deleteAssignment, onSuccess: refresh });
 
   return (
     <Card className="overflow-hidden">
@@ -94,9 +96,9 @@ function AssignmentsCard({ courseId }) {
       />
       {isPending && <LoadingState />}
       {isError && <p className="px-7 py-5 text-sm text-bad">{error.message}</p>}
-      {(create.isError || publish.isError) && (
+      {(create.isError || publish.isError || remove.isError) && (
         <div className="px-7 pt-4">
-          <FormError>{(create.error ?? publish.error).message}</FormError>
+          <FormError>{(create.error ?? publish.error ?? remove.error).message}</FormError>
         </div>
       )}
       {assignments?.length === 0 && (
@@ -156,6 +158,18 @@ function AssignmentsCard({ courseId }) {
                             Results
                           </Link>
                         )}
+                        <Button
+                          variant="danger"
+                          aria-label={`Delete ${assignment.title}`}
+                          disabled={remove.isPending}
+                          onClick={() =>
+                            window.confirm(
+                              `Delete “${assignment.title}”? Its tests and all student submissions are deleted too.`,
+                            ) && remove.mutate(assignment.id)
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        </Button>
                       </span>
                     </td>
                   </tr>
@@ -353,6 +367,8 @@ export default function CoursePage() {
         </div>
         <div className="space-y-9">
           <EnrollmentCodeCard course={course} />
+          <CourseSettingsCard course={course} />
+          <StudentsCard courseId={courseId} />
           <ConceptsCard courseId={courseId} />
         </div>
       </div>
