@@ -75,7 +75,7 @@ const FEATURES = [
     icon: Sparkles,
     tint: "pink",
     title: "AI test drafts",
-    text: "The model proposes test inputs from the task and the teacher's solution. It never writes code or expected outputs.",
+    text: "From the task statement alone, the AI writes a solution, a second one to check it, and test inputs. Expected outputs come from the sandbox.",
   },
   {
     icon: Users,
@@ -104,7 +104,7 @@ const ROLES = {
     points: [
       "Create courses, assignments and tests linked to concepts",
       "Upload lectures and labs and link pages to tests",
-      "Generate test drafts with AI from your own reference solution",
+      "Generate test drafts with AI from the task statement alone",
       "Follow submissions and the class concept report",
     ],
   },
@@ -118,9 +118,9 @@ const TRUST = [
 ];
 
 const AI_STEPS = [
-  { title: "You paste your solution", text: "Next to the task statement, in the assignment editor." },
-  { title: "The model proposes inputs", text: "Normal cases, edge cases and larger inputs, each with a reason." },
-  { title: "The sandbox computes outputs", text: "Your solution runs on every input; what it prints is the expected output." },
+  { title: "You write the statement", text: "Title and task are enough. You may also paste your own solution." },
+  { title: "The AI writes two solutions", text: "Separately, plus normal, edge and larger inputs, each with a reason." },
+  { title: "The sandbox computes outputs", text: "The solution must pass the example; tests where the two disagree are flagged." },
   { title: "You approve the drafts", text: "Drafts never count until you approve them, one by one or all at once." },
 ];
 
@@ -207,7 +207,7 @@ function Hero() {
       <div className="grid gap-7">
         <span>
           <Chip tone="pink" icon={Sparkles}>
-            New: AI test drafts from your own solution
+            New: AI test drafts from the task statement
           </Chip>
         </span>
         <h1 className="text-[clamp(20px,2.7vw,32px)] leading-snug">
@@ -344,7 +344,7 @@ function TeacherPreview() {
             </span>
           </div>
         ))}
-        <span className="text-sm text-ink-3">Expected outputs computed by your solution in the sandbox.</span>
+        <span className="text-sm text-ink-3">Expected outputs computed in the sandbox and cross-checked by a second solution.</span>
       </div>
     </Card>
   );
@@ -425,11 +425,11 @@ function AiSection() {
           <Chip tone="pink" icon={Sparkles} className="justify-self-start">
             AI, the careful way
           </Chip>
-          <h2 className="text-[clamp(14px,1.8vw,18px)] leading-relaxed">AI writes test inputs. Never the answers.</h2>
+          <h2 className="text-[clamp(14px,1.8vw,18px)] leading-relaxed">AI drafts the tests. The sandbox decides the answers.</h2>
           <p className="plain text-ink-2">
-            The students write the code; the AI only helps the teacher find more cases to test. A wrong
-            expected output would punish correct code, so outputs always come from the teacher&apos;s own
-            solution.
+            A wrong expected output would punish correct code, so the model never writes one: a solution
+            runs on every input in the sandbox. When the AI writes that solution, it must pass the example
+            in the statement and a second, independent solution checks it. The teacher approves every test.
           </p>
         </div>
         <ol className="grid gap-4 sm:grid-cols-2">

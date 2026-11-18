@@ -16,7 +16,7 @@ test("visitors see the landing page with its sections and calls to action", () =
     expect(link).toHaveAttribute("href", "/register");
   }
   expect(screen.getAllByRole("link", { name: "Sign in" })[0]).toHaveAttribute("href", "/login");
-  expect(screen.getByText("AI writes test inputs. Never the answers.")).toBeInTheDocument();
+  expect(screen.getByText("AI drafts the tests. The sandbox decides the answers.")).toBeInTheDocument();
   expect(screen.getByRole("img", { name: "3 of 4 tests passed" })).toBeInTheDocument();
 });
 
