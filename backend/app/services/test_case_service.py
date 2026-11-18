@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import InvalidDataError, NotFoundError
-from app.models import Assignment, Concept, Role, TestCase, User
+from app.models import Assignment, Concept, ReviewStatus, Role, TestCase, User
 from app.schemas.assignment import TestCaseCreate, TestCaseUpdate
 
 
@@ -40,11 +40,18 @@ def create_test_case(db: Session, assignment: Assignment, data: TestCaseCreate) 
     return test_case
 
 
-def list_test_cases(db: Session, assignment: Assignment, viewer: User) -> list[TestCase]:
-    """Teacher: every test. Student: public tests only."""
+def list_test_cases(
+    db: Session, assignment: Assignment, viewer: User, review: ReviewStatus | None = None
+) -> list[TestCase]:
+    """Teacher: every test, optionally only drafts or only approved ones.
+    Student: public, approved tests only (drafts do not exist for students)."""
     query = select(TestCase).where(TestCase.assignment_id == assignment.id)
     if viewer.role == Role.student:
-        query = query.where(TestCase.is_hidden.is_(False))
+        query = query.where(
+            TestCase.is_hidden.is_(False), TestCase.review_status == ReviewStatus.approved
+        )
+    elif review is not None:
+        query = query.where(TestCase.review_status == review)
     return list(db.scalars(query.order_by(TestCase.position, TestCase.id)))
 
 

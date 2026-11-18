@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router-dom";
 
 import * as assignmentsApi from "../../api/assignments.js";
 import { createConcept, listConcepts } from "../../api/courses.js";
+import { AiGeneratePanel, DraftsPanel, useAiConfig } from "../../components/AiTests.jsx";
 import { ErrorState, LoadingState } from "../../components/states.jsx";
 import TestCaseForm, { toRow } from "../../components/TestCaseForm.jsx";
 import { Button, buttonClass, Card, CardHeader, Chip, FormError, inputClass, PageHeader, TextField } from "../../components/ui.jsx";
@@ -68,7 +69,7 @@ function validate(details, tests) {
   return "";
 }
 
-function EditorForm({ assignment, initialTests, concepts, onSaved, onCreateConcept }) {
+function EditorForm({ assignment, initialTests, concepts, onSaved, onCreateConcept, aiPanel, draftCount }) {
   const [details, setDetails] = useState(() => detailsOf(assignment));
   const [tests, setTests] = useState(() => initialTests.map(toRow));
   const [state, setState] = useState({ busy: false, error: "", saved: false });
@@ -102,7 +103,12 @@ function EditorForm({ assignment, initialTests, concepts, onSaved, onCreateConce
           </>
         }
         title={details.title || "Untitled assignment"}
-        badge={<Chip tone={published ? "info" : "neutral"}>{published ? "Published" : "Draft"}</Chip>}
+        badge={
+          <>
+            <Chip tone={published ? "info" : "neutral"}>{published ? "Published" : "Draft"}</Chip>
+            {draftCount > 0 && <Chip tone="pink">{draftCount} AI tests still need review</Chip>}
+          </>
+        }
         subtitle="Students see the problem and the visible tests. For hidden tests they only see the verdict, the concept and your hint."
         right={
           <div className="flex flex-wrap gap-3">
@@ -149,7 +155,10 @@ function EditorForm({ assignment, initialTests, concepts, onSaved, onCreateConce
           </div>
         </Card>
         <div className="min-w-0">
-          <TestCaseForm tests={tests} onChange={setTests} concepts={concepts} onCreateConcept={onCreateConcept} />
+          <div className="stack">
+            {aiPanel}
+            <TestCaseForm tests={tests} onChange={setTests} concepts={concepts} onCreateConcept={onCreateConcept} />
+          </div>
         </div>
       </div>
     </>
@@ -172,6 +181,7 @@ export default function AssignmentEditor() {
     queryFn: () => assignmentsApi.listTestCases(assignmentId),
   });
   const courseId = assignment.data?.course_id;
+  const aiConfig = useAiConfig();
   const concepts = useQuery({
     queryKey: ["concepts", courseId],
     queryFn: () => listConcepts(courseId),
@@ -187,6 +197,17 @@ export default function AssignmentEditor() {
     queryClient.invalidateQueries({ queryKey: ["assignments", courseId] });
     setVersion((n) => n + 1);
     setSavedAt(new Date());
+  }
+
+  // Only approved tests are edited in the form; AI drafts are reviewed in their own panel.
+  // (Saving the form also deletes rows that left it, so drafts must never be part of it.)
+  const approved = tests.data.filter((test) => test.review_status !== "draft");
+  const drafts = tests.data.filter((test) => test.review_status === "draft");
+
+  async function reloadTests() {
+    await Promise.all([assignment.refetch(), tests.refetch()]);
+    queryClient.invalidateQueries({ queryKey: ["assignments", courseId] });
+    setVersion((n) => n + 1);
   }
 
   async function handleCreateConcept(name) {
@@ -205,10 +226,23 @@ export default function AssignmentEditor() {
       <EditorForm
         key={version}
         assignment={assignment.data}
-        initialTests={tests.data}
+        initialTests={approved}
         concepts={concepts.data ?? []}
         onSaved={handleSaved}
         onCreateConcept={handleCreateConcept}
+        draftCount={drafts.length}
+        aiPanel={
+          <>
+            {aiConfig.data?.ai_available && (
+              <AiGeneratePanel
+                assignmentId={assignmentId}
+                hasStatement={assignment.data.description.trim() !== ""}
+                onFinished={reloadTests}
+              />
+            )}
+            <DraftsPanel assignmentId={assignmentId} drafts={drafts} onChanged={reloadTests} />
+          </>
+        }
       />
     </>
   );

@@ -8,6 +8,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import (
+    ai,
     assignments,
     auth,
     concepts,
@@ -24,6 +25,7 @@ from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.db.session import get_background_session_factory
 from app.runner.factory import get_runner
+from app.services.ai_service import recover_interrupted_jobs
 from app.services.submission_runner import recover_interrupted_submissions
 
 logger = logging.getLogger(__name__)
@@ -41,6 +43,7 @@ def build_api_router() -> APIRouter:
     api.include_router(dashboard.router)
     api.include_router(reports.router)
     api.include_router(materials.router)
+    api.include_router(ai.router)
     return api
 
 
@@ -54,6 +57,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     db = provider()()
     try:
         recover_interrupted_submissions(db)
+        recover_interrupted_jobs(db)
     finally:
         db.close()
     remove_orphaned_sandboxes(app)

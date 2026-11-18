@@ -295,6 +295,7 @@ def _material_fields(material: Material) -> dict:
         "original_filename": material.original_filename,
         "size_bytes": material.size_bytes,
         "page_count": material.page_count,
+        "text_pages": material.text_pages,
         "created_at": material.created_at,
     }
 
@@ -524,7 +525,7 @@ def build_recommendations(
 def recommendations_for(db: Session, submission: Submission) -> RecommendationsRead:
     """Computed on demand, never stored, so it always follows the current links."""
     assignment = submission.assignment
-    test_cases = list(assignment.test_cases)
+    test_cases = assignment.approved_tests
     labels = submission_service.hidden_labels(test_cases)
     by_id = {test.id: test for test in test_cases}
     failed = []
@@ -551,3 +552,49 @@ def recommendations_for(db: Session, submission: Submission) -> RecommendationsR
         failed_tests=failed,
         materials=materials,
     )
+
+
+# --- page text for the AI linker (Step 9) ----------------------------------------------------
+
+MAX_PAGE_TEXT = 20_000
+
+
+def extract_pages(db: Session, material: Material, store: FileStore) -> int:
+    """Store the text of every page of the viewer PDF in material_pages (decision D27).
+
+    Replaces what was there before. A scanned PDF has no text layer: it ends with
+    text_pages = 0 and the linker leaves it alone.
+    """
+    from app.models import MaterialPage
+
+    for old in db.scalars(select(MaterialPage).where(MaterialPage.material_id == material.id)):
+        db.delete(old)
+    db.flush()
+    count = 0
+    try:
+        reader = PdfReader(str(store.path(material.preview_name)))
+        for number, page in enumerate(reader.pages, start=1):
+            try:
+                raw = page.extract_text() or ""
+            except Exception:  # one unreadable page must not stop the others
+                raw = ""
+            text = " ".join(raw.split())[:MAX_PAGE_TEXT]
+            if text:
+                db.add(MaterialPage(material_id=material.id, page_no=number, text=text))
+                count += 1
+    except Exception:
+        count = 0
+    material.text_pages = count
+    db.commit()
+    return count
+
+
+def extract_pages_in_background(material_id: int, session_factory, store: FileStore) -> None:
+    """After an upload, outside the request, so uploading answers as fast as before."""
+    db = session_factory()
+    try:
+        material = db.get(Material, material_id)
+        if material is not None:
+            extract_pages(db, material, store)
+    finally:
+        db.close()

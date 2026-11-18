@@ -54,6 +54,7 @@ class AssignmentRead(BaseModel):
     status: str  # draft | open | closed
     test_count: int
     hidden_test_count: int
+    draft_test_count: int = 0  # AI tests waiting for review
     created_at: datetime
     # Filled in only for the student who is asking.
     submissions_left: int | None = None
@@ -105,6 +106,11 @@ class TestCaseRead(BaseModel):
     position: int
     hint: str | None
     concepts: list[ConceptRead]
+    # Step 9: where the test comes from and whether it counts yet.
+    source: str = "manual"
+    review_status: str = "approved"
+    generation_job_id: int | None = None
+    ai_rationale: str | None = None
     # Where to study when this test fails (Step 8); teacher view only.
     materials: list[MaterialLinkRead] = []
 

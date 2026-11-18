@@ -42,3 +42,22 @@ Fișierele încărcate stau în `uploads/` (în afara git-ului). Pentru previzua
 instalat [LibreOffice](https://www.libreoffice.org/download/); pe Windows se găsește singur în
 `C:\Program Files\LibreOffice`, altfel se setează `SOFFICE_PATH` în `.env`. Fără LibreOffice,
 PDF-urile funcționează normal, iar un PPTX este refuzat cu un mesaj clar.
+
+## Teste generate cu AI (opțional)
+
+Profesorul scrie enunțul, lipește soluția lui de referință și cere modelului intrări pentru
+teste. Modelul nu scrie cod și nu scrie ieșiri: soluția profesorului rulează în sandbox-ul
+Docker pe fiecare intrare, iar ce afișează devine ieșirea așteptată. Testele generate sunt
+ciorne până când profesorul le aprobă.
+
+Funcția apare doar dacă `backend/.env` conține o cheie. Implicit se folosește catalogul NVIDIA,
+cu o cheie gratuită: pe [build.nvidia.com](https://build.nvidia.com) te autentifici, deschizi un
+model și apeși „Get API Key”.
+
+```bash
+AI_PROVIDER=nvidia
+NVIDIA_API_KEY=nvapi-...        # nu se pune niciodată în git
+AI_MODEL=qwen/qwen3-next-80b-a3b-instruct
+```
+
+Cu Claude: `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY=...` și `AI_MODEL=claude-sonnet-5-5`.

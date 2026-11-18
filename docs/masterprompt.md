@@ -15,7 +15,7 @@ Rol
 Ești inginerul care implementează acest proiect, pas cu pas. Eu sunt proprietarul lui: student în anul 3 la Calculatoare (UTCN), cunosc React, Vite, HTML, CSS și JavaScript și învăț Python și backend-ul REST în timpul proiectului. Este un proiect individual de curs, iar MVP-ul trebuie livrat până în săptămâna 13 din 14. Documentul „Masterprompt și plan de implementare” este singura sursă de adevăr pentru ce se construiește.
 
 Ce se construiește
-O platformă web în care profesorul creează cursuri, teme și teste (fiecare test legat de concepte), încarcă materialele de curs și de laborator (PDF sau PPTX) și, la fiecare temă sau test, alege materialele în care se găsesc informațiile necesare. Studentul trimite cod Python, rulat izolat în Docker, vede verdictul pe fiecare test, primește raportul „unde greșești” pe concepte și, când greșește un test, un popup care îl trimite direct la materialele indicate. Secțiunea Learn îi arată cursurile și materialele lor. După MVP, profesorul poate genera testele cu Claude (Pasul 9): modelul propune o soluție de referință și intrările, iar ieșirile așteptate vin doar din rularea soluției în sandbox.
+O platformă web în care profesorul creează cursuri, teme și teste (fiecare test legat de concepte), încarcă materialele de curs și de laborator (PDF sau PPTX) și, la fiecare temă sau test, alege materialele în care se găsesc informațiile necesare. Studentul trimite cod Python, rulat izolat în Docker, vede verdictul pe fiecare test, primește raportul „unde greșești” pe concepte și, când greșește un test, un popup care îl trimite direct la materialele indicate. Secțiunea Learn îi arată cursurile și materialele lor. După MVP, profesorul poate genera testele cu AI (Pasul 9): profesorul dă soluția de referință, modelul propune doar intrările, iar ieșirile așteptate vin doar din rularea soluției profesorului în sandbox.
 
 Obiectiv dublu
 1. Livrezi MVP-ul descris în document, complet, curat și testat.
@@ -68,7 +68,7 @@ Platforma lasă profesorul să creeze teme de programare cu teste și să încar
 
 **Constrângeri**
 
-Proiect solo, 10-12 ore pe săptămână, MVP până în săptămâna 13. Doar Python, rulare locală, fără costuri obligatorii: singura cheie API este `ANTHROPIC_API_KEY`, opțională, pentru generarea testelor din Pasul 9 (fără ea, funcția nu apare). Demo-ul rulează pe calculatorul tău. Fișierele materialelor stau pe disc, în directorul uploads/ (volum Docker în profilul demo); conversia PPTX în PDF cere LibreOffice instalat (D20).
+Proiect solo, 10-12 ore pe săptămână, MVP până în săptămâna 13. Doar Python, rulare locală, fără costuri obligatorii: singura cheie API este cea pentru generarea testelor din Pasul 9 (`NVIDIA_API_KEY`, gratuită din catalogul NVIDIA, sau `ANTHROPIC_API_KEY`), opțională (fără ea, funcția nu apare). Demo-ul rulează pe calculatorul tău. Fișierele materialelor stau pe disc, în directorul uploads/ (volum Docker în profilul demo); conversia PPTX în PDF cere LibreOffice instalat (D20).
 
 ## Arhitectura de ansamblu
 
@@ -114,7 +114,7 @@ Fiecare tehnologie are un rol precis în proiect. Tabelele sunt harta rapidă; �
 | ruff | linter și formatter pentru Python | un singur instrument rapid pentru stil și greșeli frecvente | flake8 + black |
 | python-multipart | permite lui FastAPI să primească fișiere încărcate (multipart/form-data) | dependența cerută de FastAPI pentru UploadFile | n/a |
 | pypdf | validează PDF-urile încărcate și numără paginile | bibliotecă Python pură, fără dependențe de sistem | PyMuPDF (licență AGPL) |
-| SDK-ul `anthropic` (Claude) | generează soluția de referință și intrările testelor și alege paginile din materiale (Pasul 9, opțional) | SDK-ul oficial, cu reîncercări și timeout; modelul se schimbă din `AI_MODEL` (D25) | alt furnizor prin aceeași interfață `LLMClient` |
+| SDK-ul `openai` către catalogul NVIDIA (implicit) sau SDK-ul `anthropic` (Claude) | propune intrările testelor și alege paginile din materiale (Pasul 9, opțional); nu scrie cod | SDK-uri oficiale, cu reîncercări și timeout; furnizorul se alege din `AI_PROVIDER`, modelul din `AI_MODEL` (D25) | alt furnizor prin aceeași interfață `LLMClient` |
 | Full-text search PostgreSQL (`tsvector`) | găsește paginile candidate din materiale pentru un test (Pasul 9) | deja în PostgreSQL, fără tehnologie nouă (D27) | embeddings cu pgvector |
 | LibreOffice (headless) | convertește PPTX în PDF la încărcare, ca toate materialele să se vadă în același vizualizator | singura cale gratuită și fiabilă de a randa PPTX pe server (decizia D20) | doar PDF în prima versiune; conversie în browser |
 
@@ -149,7 +149,7 @@ autograder/
       services/            # logica de business și accesul la date
       api/v1/              # routere: auth.py, courses.py, submissions.py, ...
       runner/              # base.py, subprocess_runner.py, docker_runner.py, compare.py
-      ai/                  # client.py (LLMClient, ClaudeClient, FakeLLMClient), prompts.py, schemas.py (Pasul 9)
+      ai/                  # client.py (LLMClient, NvidiaClient, ClaudeClient, FakeLLMClient), prompts.py, schemas.py (Pasul 9)
       storage/             # file_store.py (salvare, citire, stergere in uploads/), pptx_converter.py (LibreOffice)
     alembic/               # migrările
     scripts/               # seed.py, seed_demo.py
@@ -200,7 +200,7 @@ Paisprezece tabele acoperă tot proiectul (douăsprezece în MVP, plus `generati
 | Submission | id, assignment\_id, student\_id, code, language, status (`queued`, `running`, `done`, `error`), score (0-100, nul până la final), passed\_count, total\_count, error\_message, created\_at, started\_at, finished\_at | codul are maximum 64 KB; o trimitere nu se modifică după creare, doar statusul și rezultatele |
 | TestResult | id, submission\_id, test\_case\_id, verdict, actual\_output (trunchiat), stderr (trunchiat), runtime\_ms | unic pe (submission\_id, test\_case\_id); verdicte: `passed`, `wrong_answer`, `time_limit`, `memory_limit`, `runtime_error`, `internal_error` |
 | Material | id, course\_id, title, category (`lecture` sau `lab`), file\_type (pdf sau pptx), original\_filename, stored\_filename (uuid generat de server), preview\_filename (PDF-ul obținut din PPTX, nul pentru PDF), size\_bytes, page\_count, uploaded\_by, created\_at | fișierul stă pe disc, în uploads/, nu în baza de date; din Pasul 9 are și text\_pages (implicit 0, câte pagini au text extras; 0 = PDF scanat); maximum 20 MB; ștergerea cursului șterge rândurile prin cascade, iar serviciul șterge și fișierele de pe disc |
-| GenerationJob (Pasul 9) | id, assignment\_id, requested\_by, status (`queued`, `running`, `done`, `error`), reference\_code, model, tests\_proposed, tests\_kept, input\_tokens, output\_tokens, error\_message (opțional), created\_at, started\_at, finished\_at | ștergerea temei șterge joburile (cascade); `reference_code` e vizibil doar profesorului cursului; un singur job activ pe temă |
+| GenerationJob (Pasul 9) | id, assignment\_id, requested\_by, status (`queued`, `running`, `done`, `error`), reference\_code, model, tests\_requested (câte teste s-au cerut, 4-12), tests\_proposed, tests\_kept, input\_tokens, output\_tokens, error\_message (opțional), created\_at, started\_at, finished\_at | ștergerea temei șterge joburile (cascade); `reference_code` e vizibil doar profesorului cursului; un singur job activ pe temă |
 | MaterialPage (Pasul 9) | id, material\_id, page\_no (1 = prima pagină a PDF-ului sau a previzualizării), text (normalizat, cel mult 20 000 de caractere), tsv (`tsvector` generat din text, dicționar `simple`) | unic pe (material\_id, page\_no); index GIN pe tsv; ștergerea materialului șterge paginile (cascade) |
 | AssignmentMaterial | assignment\_id, material\_id, pages (text opțional, de exemplu „12-15, 18”) | cheie primară compusă (assignment\_id, material\_id); materialul trebuie să fie din același curs cu tema, altfel 422; spune studentului unde să învețe pentru întreaga temă |
 | TestCaseMaterial | test\_case\_id, material\_id, pages (text opțional) | cheie primară compusă (test\_case\_id, material\_id); același curs; alimentează popup-ul care apare când testul respectiv e greșit |
@@ -270,7 +270,7 @@ Toate rutele stau sub `/api/v1`, în afară de `/health`. „Membru” înseamn�
 | GET /assignments/{id}/materials | membru | materialele asociate temei, cu paginile indicate | 8 |
 | PUT /assignments/{id}/materials | profesorul cursului | înlocuiește lista de materiale a temei: \[{material\_id, pages}\]; materiale din alt curs dau 422 | 8 |
 | PUT /test-cases/{id}/materials | profesorul cursului | înlocuiește lista de materiale a unui test: \[{material\_id, pages}\] | 8 |
-| `GET /config` | public | `ai_available` (frontend-ul decide dacă arată butonul de generare) | 9 |
+| `GET /config` | public | `ai_available` (frontend-ul decide dacă arată butonul de generare); ruta stă sub `/api/v1` ca toate celelalte | 9 |
 | `POST /assignments/{id}/generate-tests` | profesorul cursului | pornește generarea (`count` 4-12, implicit 8); 202 cu `{job_id}`; 409 dacă există deja un job activ pe temă; 429 peste `AI_MAX_JOBS_PER_HOUR`; 503 fără AI | 9 |
 | `GET /generation-jobs/{id}` | profesorul cursului | starea jobului, `tests_kept`, eroarea, soluția de referință | 9 |
 | `POST /test-cases/{id}/approve` | profesorul cursului | aprobă o ciornă (`review_status = approved`); 422 fără `expected_output` | 9 |
@@ -419,7 +419,7 @@ Testele se scriu în același pas cu funcționalitatea, pe opt niveluri: de la f
 - **Nume și formă:** `test_<ce>_<comportament>`, cu structura aranjare, acțiune, verificare.
 - **Fixture-uri comune** în `conftest.py`: `db_session`, `client`, `make_user`, `make_course`, `teacher_token`, `student_token`. Datele de test se construiesc cu funcții simple, fără bibliotecă de factories.
 - **`FakeRunner`:** un runner determinist, programat să întoarcă verdictele dorite, ca testele de servicii să nu depindă de Docker.
-- **`FakeLLMClient` (Pasul 9):** răspunsuri fixe în locul lui Claude; niciun test nu face apeluri reale și niciun test nu are nevoie de `ANTHROPIC_API_KEY`.
+- **`FakeLLMClient` (Pasul 9):** răspunsuri fixe în locul modelului; niciun test nu face apeluri reale și niciun test nu are nevoie de o cheie (`NVIDIA_API_KEY` sau `ANTHROPIC_API_KEY`).
 - **Matricea de permisiuni:** un singur test parametrizat cu liniile (rol, metodă, cale, status așteptat); orice rută nouă adaugă o linie.
 - **Markere:** `docker` pentru testele care cer daemonul Docker, `slow` pentru cele lente. Rularea rapidă: `pytest -m "not docker"`.
 - **Acoperire:** `pytest --cov` pe `services` și `runner`, țintă orientativă 80%. Contează căile de eroare, nu cifra.
@@ -457,8 +457,8 @@ Documentul pornește de la valorile din coloana „Default propus”. Răspunde 
 | D22 | Vizibilitatea materialelor | vizibile imediat studenților înscriși la curs | stare ciornă/publicat, ca la teme |  |
 | D23 | Formatul paginilor indicate | text liber validat, de exemplu „12-15, 18”; linkul deschide prima pagină | o singură pagină; selector vizual de pagini |  |
 | D24 | Limita fișierelor încărcate | 20 MB pe fișier, doar PDF și PPTX | 50 MB; adăugarea altor formate (DOCX) |  |
-| D25 | Modelul pentru generarea testelor (Pasul 9) | Claude prin SDK-ul oficial `anthropic`, model din `AI_MODEL` (implicit `claude-sonnet-5-5`), cheia în `ANTHROPIC_API_KEY`; cheia nu ajunge în frontend sau în git (decis 17.11.2026) | alt furnizor prin `LLMClient` |  |
-| D26 | Sursa lui `expected_output` la testele generate | rularea soluției de referință în sandbox, niciodată răspunsul modelului; ieșiri corecte prin construcție (decis 17.11.2026) | n/a |  |
+| D25 | Modelul pentru generarea testelor (Pasul 9) | implicit catalogul NVIDIA (cheie gratuită), prin endpoint-ul compatibil OpenAI și SDK-ul `openai`: `AI_PROVIDER=nvidia`, `NVIDIA_API_KEY`, `AI_MODEL=qwen/qwen3-next-80b-a3b-instruct`; Claude rămâne opțiune (`AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`); cheia nu ajunge în frontend sau în git (decis 17.11.2026, revizuit 18.11.2026) | alt furnizor prin `LLMClient` |  |
+| D26 | Sursa lui `expected_output` la testele generate | soluția de referință o scrie profesorul și rulează în sandbox pe fiecare intrare; modelul propune doar intrările, nu scrie cod și nu scrie ieșiri (decis 17.11.2026, revizuit 18.11.2026) | n/a |  |
 | D27 | Căutarea paginilor candidate | full-text search PostgreSQL (`tsvector`, dicționar `simple`); fără tehnologie nouă, suficient pentru câteva sute de pagini (decis 17.11.2026) | embeddings cu pgvector |  |
 | D28 | Testele generate | ciorne până la aprobarea profesorului; evaluarea ignoră ciornele; profesorul răspunde pentru teste (decis 17.11.2026) | aprobare automată |  |
 | D29 | Disponibilitatea AI | funcție opțională: fără cheie, butonul nu apare și endpoint-urile răspund 503; aplicația merge și fără cont Claude (decis 17.11.2026) | AI obligatoriu |  |
@@ -925,40 +925,43 @@ class Runner(Protocol):
 
 **Întrebări pentru tine:** D20 (PPTX prin LibreOffice) și D21-D24. În plus: popup-ul apare automat la fiecare trimitere cu greșeli (default) sau doar prin butonul „Materiale recomandate” de lângă rezultat? Studentul poate descărca originalul (default: da)? Paginile se scriu ca interval liber (default) sau ai nevoie de un selector vizual?
 
-## Pasul 9 · Teste generate cu Claude, legate automat de materiale (rezervă, după MVP)
+## Pasul 9 · Teste generate cu AI, legate automat de materiale (rezervă, după MVP)
 
-Pas adăugat pe 17.11.2026 din documentul „Pasul 9 - Teste generate cu Claude”. Are prioritate față de restul planului unde se contrazic. Începe doar după ce pașii 0-8 sunt gata și testați: MVP-ul rămâne fără această funcție și consumă săptămâna de rezervă. Dacă timpul nu ajunge, se taie în ordinea: (a) legarea automată de materiale, (b) toată funcția; generarea testelor fără legare e deja utilă.
+Pas adăugat pe 17.11.2026 din documentul „Pasul 9 - Teste generate cu Claude” și revizuit pe 18.11.2026: modelul nu mai scrie cod (soluția de referință e a profesorului), iar furnizorul implicit e catalogul NVIDIA, cu cheie gratuită. Are prioritate față de restul planului unde se contrazic. Începe doar după ce pașii 0-8 sunt gata și testați: MVP-ul rămâne fără această funcție și consumă săptămâna de rezervă. Dacă timpul nu ajunge, se taie în ordinea: (a) legarea automată de materiale, (b) toată funcția; generarea testelor fără legare e deja utilă.
 
-**Obiectiv.** Profesorul scrie doar enunțul temei și apasă „Generate tests with AI”: platforma cere lui Claude o soluție de referință și 6-12 intrări, rulează soluția în sandbox ca să obțină ieșirile așteptate, propune conceptul, ponderea, vizibilitatea și materialul cu paginile fiecărui test, și salvează totul ca ciornă. Profesorul revizuiește și aprobă; doar testele aprobate contează la evaluare și sunt vizibile studenților. Testele scrise manual rămân posibile, exact ca până acum.
+**Obiectiv.** Profesorul scrie enunțul temei, lipește soluția lui de referință și apasă „Generate tests with AI”: platforma cere modelului 6-12 intrări (fără cod, fără ieșiri), rulează soluția profesorului în sandbox ca să obțină ieșirile așteptate, propune conceptul, ponderea, vizibilitatea și materialul cu paginile fiecărui test, și salvează totul ca ciornă. Profesorul revizuiește și aprobă; doar testele aprobate contează la evaluare și sunt vizibile studenților. Testele scrise manual rămân posibile, exact ca până acum.
 
-**Regula principală.** Modelul nu scrie niciodată `expected_output`. Ieșirea așteptată vine doar din rularea soluției de referință în sandbox (D26): un LLM greșește des ieșirile, iar un test greșit penalizează un student cu cod corect.
+**Regula principală.** Modelul nu scrie cod și nu scrie niciodată `expected_output`. Soluția de referință e a profesorului, iar ieșirea așteptată vine doar din rularea ei în sandbox (D26): un LLM greșește des ieșirile și poate scrie o soluție greșită, iar un test greșit penalizează un student cu cod corect.
 
 **Arhitectură și design**
 
-- `LLMClient` e o interfață, ca `Runner`: `complete_json(system, user, schema) -> dict`. `ClaudeClient` folosește SDK-ul oficial `anthropic` (D25), cu timeout `AI_TIMEOUT_S` și 2 reîncercări cu așteptare exponențială la 429/5xx; `FakeLLMClient` întoarce răspunsuri fixe în teste. Răspunsul se validează cu Pydantic; JSON invalid se mai cere o dată, apoi jobul trece în `error`.
-- Funcția e opțională (D29): `ai_available = AI_ENABLED and ANTHROPIC_API_KEY`. Fără cheie, butonul nu apare și endpoint-urile răspund 503. Cheia nu apare în loguri, în răspunsuri, în teste sau în git.
-- Generarea rulează ca job în fundal, ca trimiterile (Pasul 5): `POST /assignments/{id}/generate-tests` răspunde 202 cu `{job_id}`, iar interfața face polling la 2 s pe `GET /generation-jobs/{id}`. Ca la trimiteri, la pornirea aplicației joburile rămase `queued` sau `running` devin `error`.
+- `LLMClient` e o interfață, ca `Runner`: `complete_json(system, user, schema) -> dict`. `NvidiaClient` (implicit) folosește SDK-ul oficial `openai` cu adresa catalogului NVIDIA (`AI_BASE_URL`), iar `ClaudeClient` SDK-ul oficial `anthropic` (D25); ambele cu timeout `AI_TIMEOUT_S` și 2 reîncercări cu așteptare exponențială la 429/5xx; `FakeLLMClient` întoarce răspunsuri fixe în teste. Endpoint-ul NVIDIA nu are câmp pentru schemă JSON, deci schema intră în mesajul de sistem, iar răspunsul se curăță (fără bloc ```json) și se validează cu Pydantic; JSON invalid se mai cere o dată, apoi jobul trece în `error`.
+- Funcția e opțională (D29): `ai_available = AI_ENABLED and` cheia furnizorului ales (`NVIDIA_API_KEY` sau `ANTHROPIC_API_KEY`). Fără cheie, butonul nu apare și endpoint-urile răspund 503. Cheia nu apare în loguri, în răspunsuri, în teste sau în git.
+- Generarea rulează ca job în fundal, ca trimiterile (Pasul 5): `POST /assignments/{id}/generate-tests` primește `{reference_solution, count}` (soluția e obligatorie; lipsă sau goală dă 422) și răspunde 202 cu `{job_id}`, iar interfața face polling la 2 s pe `GET /generation-jobs/{id}`. Ca la trimiteri, la pornirea aplicației joburile rămase `queued` sau `running` devin `error`.
 - **Generarea (`AIService.generate_tests`)**:
   1. Jobul trece în `running`; se încarcă tema (enunț, limite) și conceptele cursului.
-  2. Apelul 1 către Claude primește enunțul (cel mult 8 000 de caractere), limbajul (Python 3.12), limitele, numele conceptelor cursului și numărul de teste dorit. Întoarce JSON `{reference_solution, tests: [{name, input, concepts, hidden, weight, rationale}]}`. Promptul cere cazuri normale, cazuri limită și cel puțin o intrare mare, concepte doar din lista primită și nicio ieșire așteptată.
-  3. Fiecare intrare se rulează cu `Runner.run` (Docker, aceleași limite ca tema, același semafor global). Testul se păstrează doar dacă rularea e curată (cod de ieșire 0, fără timp sau memorie depășite); `expected_output` = stdout-ul obținut. Primul test se rulează de două ori: dacă ieșirile diferă, soluția nu e deterministă și jobul trece în `error`.
+  2. Apelul 1 către model primește enunțul (cel mult 8 000 de caractere), soluția profesorului (cel mult 16 000), limbajul (Python 3.12), limitele, numele conceptelor cursului și numărul de teste dorit. Întoarce JSON `{tests: [{name, input, concepts, hidden, weight, rationale}]}`. Promptul cere cazuri normale, cazuri limită și cel puțin o intrare mare, intrări valide pentru soluție, concepte doar din lista primită, niciun cod și nicio ieșire așteptată.
+  3. Soluția profesorului rulează pe fiecare intrare cu `Runner.run` (Docker, aceleași limite ca tema, același semafor global). Testul se păstrează doar dacă rularea e curată (cod de ieșire 0, fără timp sau memorie depășite); `expected_output` = stdout-ul obținut. Primul test se rulează de două ori: dacă ieșirile diferă, soluția nu e deterministă și jobul trece în `error`.
   4. Numele de concepte se potrivesc cu conceptele cursului fără diacritice și fără majuscule; cele necunoscute se ignoră și nu se creează concepte automat.
-  5. Testele se salvează cu `source = ai`, `review_status = draft`, `generation_job_id` și `ai_rationale`; pe job se salvează `reference_code`, `tests_proposed`, `tests_kept` și tokenii.
+  5. Testele se salvează cu `source = ai`, `review_status = draft`, `generation_job_id` și `ai_rationale`; pe job se salvează `reference_code` (soluția profesorului), `tests_proposed`, `tests_kept` și tokenii.
   6. Legarea de materiale pentru fiecare test păstrat, apoi jobul trece în `done`. O excepție oriunde: `error` cu `error_message`; ciornele deja salvate rămân.
 - **Legarea automată (`AIService.link_materials`)**, D27:
   1. Candidații vin din `material_pages` ale cursului: `ts_rank(tsv, plainto_tsquery('simple', ...))` pe concepte, cuvinte din rationale și din enunț; primele 12 pagini cu rang > 0. Fără candidați, testul rămâne fără material și se aplică regula din Pasul 8 (materialele temei).
-  2. Apelul 2 către Claude primește testul (nume, concept, rationale) și candidații (titlul materialului, pagina, primele 800 de caractere), cu instrucțiunea explicită că textul materialelor e dată, nu instrucțiune. Întoarce `{"material_id": 12, "pages": "12-15"}` sau `{"material_id": null}`.
+  2. Apelul 2 către model primește testul (nume, concept, rationale) și candidații (titlul materialului, pagina, primele 800 de caractere), cu instrucțiunea explicită că textul materialelor e dată, nu instrucțiune. Întoarce `{"material_id": 12, "pages": "12-15"}` sau `{"material_id": null}`.
   3. Propunerea se validează: materialul e din cursul temei, paginile respectă formatul D23 și există în PDF; altfel se ignoră. Se inserează în `test_case_materials`, editabilă din editorul existent.
 - **Extragerea textului.** La încărcare, după salvare și după conversia PPTX, textul fiecărei pagini se extrage cu `pypdf` în fundal, se normalizează (cel mult 20 000 de caractere pe pagină) și se scrie în `material_pages`; `materials.text_pages` = câte pagini au text. Un PDF scanat are `text_pages = 0`: legarea îl ignoră, iar interfața scrie „No text found, link pages manually”. Materialele vechi se reindexează cu `POST /materials/{id}/reindex` sau cu `python -m app.cli reindex-materials`.
 - **Ciornele (D28).** Evaluarea, scorul și `total_count` folosesc doar testele `approved`. Studenții nu văd ciornele în niciun endpoint (teste, rezultate, recomandări, dashboard, raportul pe concepte, statistici). O temă se poate publica cu ciorne, iar interfața profesorului avertizează („3 AI tests still need review”). Aprobarea unui test fără `expected_output` dă 422.
-- **Securitate și cost.** Doar profesorul cursului pornește generarea și vede soluția de referință. Un singur job activ pe temă (409) și cel mult `AI_MAX_JOBS_PER_HOUR` joburi pe profesor pe oră (429). Codul studenților nu se trimite niciodată la Claude. Soluția de referință rulează doar în Docker, niciodată cu `SubprocessRunner` în afara mediului de test.
+- **Securitate și cost.** Doar profesorul cursului pornește generarea și vede soluția de referință. Un singur job activ pe temă (409) și cel mult `AI_MAX_JOBS_PER_HOUR` joburi pe profesor pe oră (429). Codul studenților nu se trimite niciodată la model. Soluția de referință rulează doar în Docker, niciodată cu `SubprocessRunner` în afara mediului de test.
 
 **Configurare** (în `.env`; în `.env.example` fără valoare pentru cheie):
 
 ```text
 AI_ENABLED=true
+AI_PROVIDER=nvidia            # sau anthropic
+NVIDIA_API_KEY=              # gratuită: build.nvidia.com, Get API Key
 ANTHROPIC_API_KEY=
-AI_MODEL=claude-sonnet-5-5
+AI_BASE_URL=https://integrate.api.nvidia.com/v1
+AI_MODEL=qwen/qwen3-next-80b-a3b-instruct   # cu Claude: claude-sonnet-5-5
 AI_TIMEOUT_S=60
 AI_MAX_JOBS_PER_HOUR=5
 ```
@@ -966,16 +969,16 @@ AI_MAX_JOBS_PER_HOUR=5
 **Cod de scris**
 
 - Migrare Alembic: tabelele `generation_jobs` și `material_pages` (coloana `tsv` generată, index GIN), coloanele noi din `test_cases` și `materials` (vezi „Modelul de date”). Enumerări noi `TestSource` și `ReviewStatus`; starea jobului refolosește valorile `queued`, `running`, `done`, `error`.
-- `app/ai/client.py` (`LLMClient`, `ClaudeClient`, `FakeLLMClient`), `app/ai/prompts.py` (șabloanele și schemele JSON), `app/ai/schemas.py` (`GeneratedTest`, `GenerationResult`, `MaterialChoice`).
+- `app/ai/client.py` (`LLMClient`, `NvidiaClient`, `ClaudeClient`, `FakeLLMClient`), `app/ai/prompts.py` (șabloanele și schemele JSON), `app/ai/schemas.py` (`GeneratedTest`, `GenerationResult`, `MaterialChoice`).
 - `app/services/ai_service.py`: `generate_tests(job_id)`, `link_materials(test_case_id)`, `approve(...)`, `approve_all(...)`; `material_service.extract_pages(material)`.
 - `app/api/v1/ai.py` cu rutele noi și `GET /config`; `app/cli.py` cu `reindex-materials`.
 - Evaluarea din `submission_service` și agregările din `dashboard_service` și `report_service` filtrează `review_status = approved`.
-- Dependința `anthropic` în `pyproject.toml`.
-- Frontend, în editorul temei: butonul „Generate tests with AI” (doar dacă `ai_available`, dezactivat cu enunț gol); panoul cu starea jobului („Writing reference solution”, „Running in sandbox”, „Linking materials”, apoi „8 tests ready for review” sau eroarea); ciornele ca carduri (nume, intrare, ieșire așteptată, concept, ascuns, pondere, materialul propus cu link spre vizualizator, `ai_rationale` scris mic) cu Approve, Edit, Delete și, sus, „Approve all” cu numărul de ciorne rămase; soluția de referință într-o secțiune pliată, doar pentru citire; eticheta „AI” pe testele aprobate cu `source = ai`.
+- Dependințele `openai` și `anthropic` în `pyproject.toml`.
+- Frontend, în editorul temei: câmpul „Your reference solution” și butonul „Generate tests with AI” (doar dacă `ai_available`, dezactivat cu enunț gol sau fără soluție); panoul cu starea jobului („Proposing test inputs”, „Running in sandbox”, „Linking materials”, apoi „8 tests ready for review” sau eroarea); ciornele ca carduri (nume, intrare, ieșire așteptată, concept, ascuns, pondere, materialul propus cu link spre vizualizator, `ai_rationale` scris mic) cu Approve, Edit, Delete și, sus, „Approve all” cu numărul de ciorne rămase; soluția folosită și tokenii într-o secțiune pliată; eticheta „AI” pe testele aprobate cu `source = ai`.
 
 **Tehnologii explicate**
 
-- **SDK-ul `anthropic` și răspunsuri JSON validate:** de ce un model de limbaj nu e o sursă de adevăr pentru ieșiri și cum îl îngrădești cu o schemă Pydantic și reîncercări.
+- **Un model prin API compatibil OpenAI și răspunsuri JSON validate:** de ce un model de limbaj nu e o sursă de adevăr pentru ieșiri și cum îl îngrădești cu o schemă Pydantic și reîncercări.
 - **Full-text search în PostgreSQL:** `tsvector`, `plainto_tsquery`, `ts_rank`, dicționarul `simple`, coloane generate și indexul GIN; de ce nu embeddings (D27).
 - **Prompt injection:** textul materialelor ajunge în prompt, deci e tratat ca dată, iar propunerile modelului se validează înainte să fie salvate.
 - **Job-uri asincrone cu cost:** limitarea pe oră, un singur job activ pe temă, tokenii salvați pe job.
@@ -983,7 +986,9 @@ AI_MAX_JOBS_PER_HOUR=5
 **Teste** (toate cu `FakeLLMClient`, fără rețea; unde e nevoie, cu `SubprocessRunner` în mediul de test)
 
 - răspuns JSON invalid: o reîncercare, apoi job `error`;
-- `expected_output` vine din rularea soluției, nu din răspuns (un răspuns fals cu ieșiri greșite nu le salvează);
+- `expected_output` vine din rularea soluției profesorului, nu din răspuns (un răspuns fals cu ieșiri greșite nu le salvează); promptul conține soluția, iar schema nu cere cod;
+- fără soluție de referință: 422;
+- `NvidiaClient`: JSON într-un bloc ```json acceptat, răspuns tăiat și erorile SDK-ului transformate în `LLMError` (clientul SDK e înlocuit, fără rețea);
 - o intrare pe care soluția dă eroare sau depășește timpul e eliminată (`tests_kept < tests_proposed`);
 - soluție nedeterministă: job `error`;
 - concept necunoscut ignorat, concept existent mapat corect (inclusiv fără diacritice);
@@ -994,15 +999,15 @@ AI_MAX_JOBS_PER_HOUR=5
 
 **Gata când**
 
-- [ ] profesorul scrie un enunț, apasă butonul și în sub 2 minute vede 6-12 ciorne cu ieșiri corecte (verificat manual pe 3 teme diferite)
+- [ ] profesorul scrie un enunț, lipește soluția, apasă butonul și în sub 2 minute vede 6-12 ciorne cu ieșiri corecte (verificat manual pe 3 teme diferite)
 - [ ] cel puțin jumătate din ciorne au material și pagini propuse, pentru un curs cu PDF-uri care au text
 - [ ] după „Approve all”, un student e evaluat doar pe testele aprobate, iar la un test picat popup-ul arată materialul propus de AI
-- [ ] toate testele de mai sus trec în CI, fără apeluri reale la Claude
-- [ ] documentația e actualizată: use case „Generare teste cu AI” (actor secundar Claude API), diagrama de clase (`AIService`, `LLMClient`, `ClaudeClient`, `GenerationJob`, `MaterialPage`), baza de date cu 14 tabele, secvența „generarea testelor”, `docs/api.md`, D25-D29 în `docs/decizii.md`
+- [ ] toate testele de mai sus trec în CI, fără apeluri reale la vreun model
+- [ ] documentația e actualizată: use case „Generare teste cu AI” (actor secundar API-ul modelului), diagrama de clase (`AIService`, `LLMClient`, `NvidiaClient`, `ClaudeClient`, `GenerationJob`, `MaterialPage`), baza de date cu 14 tabele, secvența „generarea testelor”, `docs/api.md`, D25-D29 în `docs/decizii.md`
 
-**Întrebări de verificare:** De ce nu ne bazăm pe ieșirile scrise de model și cum obținem `expected_output`? Ce se întâmplă dacă materialul e un PDF scanat sau dacă modelul propune pagini care nu există? Cum te asiguri că o ciornă greșită nu scade nota unui student?
+**Întrebări de verificare:** De ce nu ne bazăm pe codul și pe ieșirile scrise de model și cum obținem `expected_output`? Ce se întâmplă dacă materialul e un PDF scanat sau dacă modelul propune pagini care nu există? Cum te asiguri că o ciornă greșită nu scade nota unui student?
 
-**Git:** ramura `pas-9/teste-ai`; cheia `ANTHROPIC_API_KEY` nu apare în niciun commit (se verifică `git diff --staged` înainte de fiecare commit).
+**Git:** ramura `pas-9/teste-ai`; cheile `NVIDIA_API_KEY` și `ANTHROPIC_API_KEY` nu apar în niciun commit (se verifică `git diff --staged` înainte de fiecare commit).
 
 ## Pasul 10 · Calitate, securitate și livrare locală (săpt. 12)
 
@@ -1163,8 +1168,8 @@ Se parcurge la sfârșitul Pasului 4, secțiunea „Fișiere încărcate” la s
 
 **Generare cu AI (Pasul 9)**
 
-- [ ] `ANTHROPIC_API_KEY` doar în `.env`, niciodată în git, în loguri, în răspunsuri sau în teste
-- [ ] codul studenților nu se trimite niciodată la Claude; enunțul trimis are cel mult 8 000 de caractere
+- [ ] `NVIDIA_API_KEY` și `ANTHROPIC_API_KEY` doar în `.env`, niciodată în git, în loguri, în răspunsuri sau în teste
+- [ ] codul studenților nu se trimite niciodată la model; enunțul trimis are cel mult 8 000 de caractere
 - [ ] soluția de referință rulează doar în sandbox-ul Docker, cu limitele temei și semaforul global
 - [ ] `expected_output` vine doar din rularea soluției; propunerile de concepte și pagini se validează înainte de salvare
 - [ ] textul materialelor din prompt e marcat ca dată, nu ca instrucțiune

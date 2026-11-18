@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    Enum,
     ForeignKey,
     Integer,
     String,
@@ -17,6 +18,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.models.generation import ReviewStatus, TestSource
 
 if TYPE_CHECKING:
     from app.models.course import Concept, Course
@@ -59,12 +61,22 @@ class Assignment(Base):
         return "open"
 
     @property
+    def approved_tests(self) -> list[TestCase]:
+        """The tests that count: evaluation and students only ever see these (Step 9)."""
+        return [test for test in self.test_cases if test.review_status == ReviewStatus.approved]
+
+    @property
     def test_count(self) -> int:
-        return len(self.test_cases)
+        return len(self.approved_tests)
 
     @property
     def hidden_test_count(self) -> int:
-        return sum(1 for test in self.test_cases if test.is_hidden)
+        return sum(1 for test in self.approved_tests if test.is_hidden)
+
+    @property
+    def draft_test_count(self) -> int:
+        """AI-generated tests still waiting for the teacher's review."""
+        return len(self.test_cases) - len(self.approved_tests)
 
 
 # Pure link table for the many-to-many relation between tests and concepts.
@@ -91,6 +103,21 @@ class TestCase(Base):
     weight: Mapped[int] = mapped_column(Integer, default=1)
     position: Mapped[int] = mapped_column(Integer, default=0)
     hint: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Step 9: tests written by the AI generator start as drafts and count only once approved.
+    source: Mapped[TestSource] = mapped_column(
+        Enum(TestSource, native_enum=False, length=16),
+        default=TestSource.manual,
+        server_default=TestSource.manual.value,
+    )
+    review_status: Mapped[ReviewStatus] = mapped_column(
+        Enum(ReviewStatus, native_enum=False, length=16),
+        default=ReviewStatus.approved,
+        server_default=ReviewStatus.approved.value,
+    )
+    generation_job_id: Mapped[int | None] = mapped_column(
+        ForeignKey("generation_jobs.id", ondelete="SET NULL"), nullable=True
+    )
+    ai_rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     assignment: Mapped[Assignment] = relationship(back_populates="test_cases")
     concepts: Mapped[list[Concept]] = relationship(

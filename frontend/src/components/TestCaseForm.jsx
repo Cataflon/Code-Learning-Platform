@@ -31,6 +31,7 @@ export function toRow(test) {
     weight: test.weight,
     hint: test.hint ?? "",
     concept_ids: test.concepts.map((concept) => concept.id),
+    source: test.source ?? "manual",
   };
 }
 
@@ -199,6 +200,7 @@ function TestRow({ test, index, concepts, onChange, onRemove, onCreateConcept })
             onChange={(event) => set("weight")(event.target.value === "" ? "" : Number(event.target.value))}
           />
         </label>
+        {test.source === "ai" && <Chip tone="pink">AI</Chip>}
         <span className="flex items-center gap-3 text-sm text-ink-3">
           Hidden
           <Toggle checked={test.is_hidden} onChange={set("is_hidden")} label={`Hide ${label}`} />

@@ -27,6 +27,7 @@ from app.models import (
     Concept,
     Course,
     Enrollment,
+    ReviewStatus,
     Submission,
     SubmissionStatus,
     TestCase,
@@ -278,7 +279,11 @@ def _hidden_labels(db: Session, assignment_ids: set[int]) -> dict[int, str]:
     """Hidden tests keep their anonymous name, numbered per assignment like on the results."""
     rows = db.execute(
         select(TestCase.id, TestCase.assignment_id)
-        .where(TestCase.assignment_id.in_(assignment_ids), TestCase.is_hidden.is_(True))
+        .where(
+            TestCase.assignment_id.in_(assignment_ids),
+            TestCase.is_hidden.is_(True),
+            TestCase.review_status == ReviewStatus.approved,
+        )
         .order_by(TestCase.assignment_id, TestCase.position, TestCase.id)
     )
     labels: dict[int, str] = {}

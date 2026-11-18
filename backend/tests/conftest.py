@@ -14,6 +14,7 @@ from sqlalchemy import URL, Engine, create_engine, make_url, text
 from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401
+from app.ai.client import FakeLLMClient, get_llm_client
 from app.core.config import get_settings
 from app.core.security import create_access_token, hash_password
 from app.db.base import Base
@@ -86,6 +87,17 @@ def db_session(engine: Engine) -> Iterator[Session]:
 
 
 @pytest.fixture(autouse=True)
+def no_real_ai_key(monkeypatch):
+    """Tests never see a real NVIDIA or Anthropic key, even if the developer's .env has one."""
+    from pydantic import SecretStr
+
+    monkeypatch.setattr(get_settings(), "nvidia_api_key", SecretStr(""))
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", SecretStr(""))
+    monkeypatch.setattr(get_settings(), "ai_provider", "nvidia")
+    monkeypatch.setattr(get_settings(), "ai_enabled", True)
+
+
+@pytest.fixture(autouse=True)
 def no_submission_interval(monkeypatch):
     """Tests submit in quick succession; the 429 rule is switched on only where it is tested."""
     monkeypatch.setattr(get_settings(), "min_submission_interval_s", 0)
@@ -123,6 +135,8 @@ def client(
     # Uploads go to a temporary folder; PPTX "conversion" is faked unless a test says otherwise.
     app.dependency_overrides[get_file_store] = lambda: file_store
     app.dependency_overrides[get_converter] = lambda: fake_converter
+    # Never the real Claude: a test that generates tests sets its own scripted client.
+    app.dependency_overrides[get_llm_client] = lambda: FakeLLMClient([])
     with TestClient(app) as test_client:
         yield test_client
 

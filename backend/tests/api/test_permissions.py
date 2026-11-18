@@ -169,6 +169,21 @@ MATRIX = [
     ("owner", "GET", SUBMISSION + "/recommendations", None, 200),
     ("classmate", "GET", SUBMISSION + "/recommendations", None, 404),
     ("other_teacher", "GET", SUBMISSION + "/recommendations", None, 404),
+    # --- AI test generation (no API key in tests: the owner gets 503)
+    ("anonymous", "GET", "/config", None, 200),
+    ("anonymous", "POST", ASSIGNMENT + "/generate-tests", None, 401),
+    ("member", "POST", ASSIGNMENT + "/generate-tests", None, 403),
+    ("other_teacher", "POST", ASSIGNMENT + "/generate-tests", None, 404),
+    ("owner", "POST", ASSIGNMENT + "/generate-tests", None, 503),
+    ("member", "POST", TEST_CASE + "/approve", None, 403),
+    ("other_teacher", "POST", TEST_CASE + "/approve", None, 404),
+    ("owner", "POST", TEST_CASE + "/approve", None, 200),
+    ("member", "POST", ASSIGNMENT + "/tests/approve-all", None, 403),
+    ("other_teacher", "POST", ASSIGNMENT + "/tests/approve-all", None, 404),
+    ("owner", "POST", ASSIGNMENT + "/tests/approve-all", None, 200),
+    ("member", "POST", MATERIAL + "/reindex", None, 403),
+    ("other_teacher", "POST", MATERIAL + "/reindex", None, 404),
+    ("owner", "POST", MATERIAL + "/reindex", None, 200),
 ]
 
 

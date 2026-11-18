@@ -20,6 +20,8 @@ rectangle "Platforma de programare cu autograder" {
   usecase "Încarcă materiale PDF / PPTX" as UC12
   usecase "Leagă materiale de teme și teste" as UC13
   usecase "Vede trimiterile și statisticile" as UC14
+  usecase "Generare teste cu AI" as UC15
+  usecase "Revizuiește și aprobă testele generate" as UC16
 
   usecase "Rulează codul în sandbox Docker" as UC20
 }
@@ -37,6 +39,13 @@ Teacher --> UC11
 Teacher --> UC12
 Teacher --> UC13
 Teacher --> UC14
+Teacher --> UC15
+Teacher --> UC16
+
+actor "API-ul modelului\n(NVIDIA / Claude)" as LLM
+UC15 --> LLM
+UC15 ..> UC11 : <<extend>>
+UC15 ..> UC20 : <<include>>
 
 UC4 ..> UC20 : <<include>>
 UC4 ..> UC5 : <<include>>

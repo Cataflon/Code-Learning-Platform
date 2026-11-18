@@ -2,6 +2,7 @@
 
 from app.models.assignment import Assignment, TestCase, test_case_concepts
 from app.models.course import COURSE_COLORS, Concept, Course, Enrollment
+from app.models.generation import GenerationJob, MaterialPage, ReviewStatus, TestSource
 from app.models.material import (
     AssignmentMaterial,
     FileType,
@@ -20,14 +21,18 @@ __all__ = [
     "Course",
     "Enrollment",
     "FileType",
+    "GenerationJob",
     "Material",
     "MaterialCategory",
+    "MaterialPage",
+    "ReviewStatus",
     "Role",
     "Submission",
     "SubmissionStatus",
     "TestCase",
     "TestCaseMaterial",
     "TestResult",
+    "TestSource",
     "User",
     "Verdict",
     "test_case_concepts",
