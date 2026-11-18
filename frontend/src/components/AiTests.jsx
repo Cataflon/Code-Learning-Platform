@@ -39,13 +39,16 @@ export function useGenerationJob(jobId, interval = POLL_MS) {
 }
 
 /** "Generate tests with AI" and the panel that follows the job. */
-export function AiGeneratePanel({ assignmentId, hasStatement, onFinished, interval = POLL_MS }) {
+export function AiGeneratePanel({ assignmentId, hasStatement, beforeGenerate, onFinished, interval = POLL_MS }) {
   const [count, setCount] = useState(8);
   const [solution, setSolution] = useState("");
   const [jobId, setJobId] = useState(null);
   const [finishedId, setFinishedId] = useState(null);
   const start = useMutation({
-    mutationFn: () => aiApi.generateTests(assignmentId, count, solution),
+    mutationFn: async () => {
+      await beforeGenerate?.(); // the server reads the saved statement, so save it first
+      return aiApi.generateTests(assignmentId, count, solution);
+    },
     onSuccess: (created) => setJobId(created.job_id),
   });
   const job = useGenerationJob(jobId, interval);
@@ -90,8 +93,9 @@ export function AiGeneratePanel({ assignmentId, hasStatement, onFinished, interv
           model also writes the solution, plus a second one of its own to cross-check it: tests where the
           two disagree are flagged. Either way the expected outputs come from running a solution in the
           sandbox, never from the model. New tests arrive as drafts and count only after you approve them.
-          {!hasStatement && " Save a task statement first."}
+          The assignment details are saved when you start.
         </p>
+        {!hasStatement && <p className="text-sm text-warn">Write the problem statement first (in Details, on the left).</p>}
         <label className="label">
           Your reference solution (optional)
           <textarea
@@ -100,7 +104,7 @@ export function AiGeneratePanel({ assignmentId, hasStatement, onFinished, interv
             onChange={(event) => setSolution(event.target.value)}
             disabled={running}
             spellCheck={false}
-            placeholder={"n = abs(int(input()))\nprint(sum(int(d) for d in str(n)))"}
+            placeholder="# Optional. Leave empty and the AI writes the solution, or paste yours here."
           />
         </label>
         <FormError>{start.isError ? start.error.message : ""}</FormError>
