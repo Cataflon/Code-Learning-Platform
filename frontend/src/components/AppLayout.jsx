@@ -19,6 +19,8 @@ const ICONS = {
   learn: <path d="M12 6c-2-1.3-4.5-1.6-8-1.5v13c3.5-.1 6 .2 8 1.5 2-1.3 4.5-1.6 8-1.5v-13c-3.5-.1-6 .2-8 1.5zM12 6v13" />,
   report: <path d="M6 20v-6M12 20V5M18 20v-9" />,
   profile: <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1-4 4-6 8-6s7 2 8 6" />,
+  users: <path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2 20c.8-3.5 3.5-5.5 7-5.5s6.2 2 7 5.5M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14.8c2 .7 3.4 2.4 4 5.2" />,
+  key: <path d="M14 10a4 4 0 1 0-3.5 4L4 20.5V22h3v-2h2v-2h2l2.5-2.5A4 4 0 0 0 14 10zM16 7h.01" />,
 };
 
 function NavIcon({ name }) {
@@ -34,6 +36,11 @@ const STUDENT_NAV = [
   { to: "/courses", label: "Courses", short: "Courses", icon: "courses" },
   { to: "/learn", label: "Learn", short: "Learn", icon: "learn" },
   { to: "/report", label: "Concept report", short: "Report", icon: "report" },
+];
+const ADMIN_NAV = [
+  { to: "/admin/users", label: "Users", short: "Users", icon: "users" },
+  { to: "/admin/invites", label: "Invite codes", short: "Invites", icon: "key" },
+  { to: "/profile", label: "Profile", short: "Profile", icon: "profile" },
 ];
 const TEACHER_NAV = [
   { to: "/courses", label: "My courses", short: "Courses", icon: "courses" },
@@ -95,7 +102,7 @@ function useNavIndicator(location) {
 export default function AppLayout() {
   const { user } = useAuth();
   const location = useLocation();
-  const nav = user.role === "teacher" ? TEACHER_NAV : STUDENT_NAV;
+  const nav = { teacher: TEACHER_NAV, admin: ADMIN_NAV }[user.role] ?? STUDENT_NAV;
   const { navRef, indRef, moveTo, reset } = useNavIndicator(location);
 
   return (

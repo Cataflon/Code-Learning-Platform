@@ -13,7 +13,7 @@ python -m venv .venv
 .venv\Scripts\activate                       # Windows; pe Linux/macOS: source .venv/bin/activate
 pip install -e ".[dev]"
 alembic upgrade head                         # creeaza tabelele
-python -m scripts.seed                       # date de test (parola: parola123)
+python -m scripts.seed                       # date de test (parola: parola123), inclusiv admin@utcluj.ro
 python -m scripts.seed_demo                  # curs demo pentru raport + materiale demo
 uvicorn app.main:app --reload                # http://localhost:8000/docs
 ```
@@ -42,6 +42,17 @@ Fișierele încărcate stau în `uploads/` (în afara git-ului). Pentru previzua
 instalat [LibreOffice](https://www.libreoffice.org/download/); pe Windows se găsește singur în
 `C:\Program Files\LibreOffice`, altfel se setează `SOFFICE_PATH` în `.env`. Fără LibreOffice,
 PDF-urile funcționează normal, iar un PPTX este refuzat cu un mesaj clar.
+
+## Administrare
+
+Contul `admin` (administrator tehnic) vede toți utilizatorii, le poate schimba rolul, îi poate
+dezactiva sau le poate da o parolă temporară și generează codurile de invitație cu care se
+înregistrează profesorii (pagina „Invite codes”). Primul admin se creează din terminal:
+
+```bash
+cd backend
+python -m app.cli create-admin admin@exemplu.ro "Nume Admin"   # cere parola
+```
 
 ## Teste generate cu AI (opțional)
 

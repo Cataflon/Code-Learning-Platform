@@ -112,6 +112,14 @@ def leave_course(db: Session, student: User, course: Course) -> None:
     db.commit()
 
 
+def remove_student(db: Session, course: Course, student_id: int) -> None:
+    enrollment = db.get(Enrollment, (student_id, course.id))
+    if enrollment is None:
+        raise NotFoundError("This student is not enrolled in the course")
+    db.delete(enrollment)
+    db.commit()
+
+
 def list_students(
     db: Session, course: Course, limit: int = 100, offset: int = 0
 ) -> list[StudentRead]:

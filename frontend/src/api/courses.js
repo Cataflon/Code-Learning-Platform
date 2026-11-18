@@ -13,3 +13,7 @@ export const newJoinCode = (id) => apiFetch(`/courses/${id}/join-code`, { method
 export const listConcepts = (courseId) => apiFetch(`/courses/${courseId}/concepts`);
 export const createConcept = (courseId, name) =>
   apiFetch(`/courses/${courseId}/concepts`, { method: "POST", body: { name } });
+
+export const listStudents = (courseId) => apiFetch(`/courses/${courseId}/students`);
+export const removeStudent = (courseId, studentId) =>
+  apiFetch(`/courses/${courseId}/students/${studentId}`, { method: "DELETE" });

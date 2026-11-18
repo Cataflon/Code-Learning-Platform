@@ -7,6 +7,7 @@ Actors:
   member         a student enrolled in the course
   classmate      another student enrolled in the same course
   outsider       a student who is not enrolled
+  admin          the technical admin (accounts and invite codes, no course content)
 
 Every new route adds lines here.
 """
@@ -184,6 +185,31 @@ MATRIX = [
     ("member", "POST", MATERIAL + "/reindex", None, 403),
     ("other_teacher", "POST", MATERIAL + "/reindex", None, 404),
     ("owner", "POST", MATERIAL + "/reindex", None, 200),
+    # --- teacher removes a student from the course
+    ("anonymous", "DELETE", COURSE + "/students/{member_id}", None, 401),
+    ("member", "DELETE", COURSE + "/students/{member_id}", None, 403),
+    ("other_teacher", "DELETE", COURSE + "/students/{member_id}", None, 404),
+    ("owner", "DELETE", COURSE + "/students/{member_id}", None, 204),
+    ("owner", "DELETE", COURSE + "/students/{outsider_id}", None, 404),
+    # --- technical admin (decision D30): accounts and invite codes, never course content
+    ("anonymous", "GET", "/admin/users", None, 401),
+    ("member", "GET", "/admin/users", None, 403),
+    ("owner", "GET", "/admin/users", None, 403),
+    ("admin", "GET", "/admin/users", None, 200),
+    ("owner", "GET", "/admin/stats", None, 403),
+    ("admin", "GET", "/admin/stats", None, 200),
+    ("owner", "PATCH", "/admin/users/{member_id}", {"is_active": False}, 403),
+    ("admin", "PATCH", "/admin/users/{member_id}", {"is_active": False}, 200),
+    ("owner", "POST", "/admin/users/{member_id}/reset-password", None, 403),
+    ("admin", "POST", "/admin/users/{member_id}/reset-password", None, 200),
+    ("member", "GET", "/admin/invite-codes", None, 403),
+    ("admin", "GET", "/admin/invite-codes", None, 200),
+    ("owner", "POST", "/admin/invite-codes", {}, 403),
+    ("admin", "POST", "/admin/invite-codes", {}, 201),
+    ("admin", "GET", COURSE, None, 404),
+    ("admin", "GET", ASSIGNMENT, None, 404),
+    ("admin", "POST", "/courses", NEW_COURSE, 403),
+    ("admin", "GET", SUBMISSION, None, 404),
 ]
 
 
@@ -191,6 +217,7 @@ MATRIX = [
 def world(db_session, make_user, make_course, make_assignment, make_test_case, make_material):
     """One course with every kind of actor around it."""
     owner, other_teacher = make_user(Role.teacher), make_user(Role.teacher)
+    admin = make_user(Role.admin)
     member, outsider = make_user(Role.student), make_user(Role.student)
     classmate = make_user(Role.student)
     course = make_course(owner, students=[member, classmate])
@@ -208,6 +235,7 @@ def world(db_session, make_user, make_course, make_assignment, make_test_case, m
             "member": member,
             "classmate": classmate,
             "outsider": outsider,
+            "admin": admin,
         },
         "ids": {
             "course": course.id,
@@ -216,6 +244,8 @@ def world(db_session, make_user, make_course, make_assignment, make_test_case, m
             "test_case": test_case.id,
             "submission": submission.id,
             "material": make_material(course).id,
+            "member_id": member.id,
+            "outsider_id": outsider.id,
         },
     }
 

@@ -26,10 +26,13 @@ import MaterialsPage from "./pages/teacher/MaterialsPage.jsx";
 import StudyMaterialsEditor from "./pages/teacher/StudyMaterialsEditor.jsx";
 import SubmissionsPage from "./pages/teacher/SubmissionsPage.jsx";
 import TeacherCoursesPage from "./pages/teacher/TeacherCoursesPage.jsx";
+import AdminInvitesPage from "./pages/admin/AdminInvitesPage.jsx";
+import AdminUsersPage from "./pages/admin/AdminUsersPage.jsx";
 
 /** Same path, different page per role. */
 function ByRole({ student, teacher }) {
   const { user } = useAuth();
+  if (user.role === "admin") return <Navigate to={homePathFor(user)} replace />;
   return user.role === "teacher" ? teacher : student;
 }
 
@@ -61,6 +64,10 @@ export function AppRoutes() {
             <Route path="/report" element={<ConceptReport />} />
             <Route path="/learn" element={<Learn />} />
             <Route path="/learn/courses/:courseId" element={<LearnCourse />} />
+          </Route>
+          <Route element={<ProtectedRoute roles={["admin"]} />}>
+            <Route path="/admin/users" element={<AdminUsersPage />} />
+            <Route path="/admin/invites" element={<AdminInvitesPage />} />
           </Route>
           <Route element={<ProtectedRoute roles={["teacher"]} />}>
             <Route path="/courses/:courseId" element={<CoursePage />} />

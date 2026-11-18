@@ -44,7 +44,8 @@ class Settings(BaseSettings):
     # Authentication
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 60
-    # Registering as a teacher requires this code (decision D5).
+    # Registering as a teacher requires an invite code made by an admin (D30). This code from
+    # the settings is also accepted, so a new install has a way in; empty = only admin codes.
     teacher_invite_code: str = "PROF-2026"
 
     # Code execution (decision D12 for the defaults)

@@ -1,12 +1,45 @@
-import { MessageSquare } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { LogOut, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+
+import { leaveCourse } from "../api/courses.js";
 
 import { courseBarClass } from "../components/courseColors.js";
 import { EmptyState, ErrorState, LoadingState } from "../components/states.jsx";
 import { Button, Card, CardHeader, Chip, FormError, inputClass, PageHeader } from "../components/ui.jsx";
 import { useAssignments, useCourses, useJoinCourse } from "../hooks/useCourses.js";
 import { formatDay, plural } from "../lib/format.js";
+
+function LeaveButton({ course }) {
+  const queryClient = useQueryClient();
+  const leave = useMutation({
+    mutationFn: () => leaveCourse(course.id),
+    onSuccess: () => {
+      for (const key of ["courses", "dashboard", "learn", "concept-report"]) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
+    },
+  });
+  return (
+    <>
+      <Button
+        variant="neutral"
+        size="sm"
+        disabled={leave.isPending}
+        onClick={() =>
+          window.confirm(
+            `Leave “${course.title}”? You will no longer see its assignments. Your submissions are kept, and you can join again with the code.`,
+          ) && leave.mutate()
+        }
+      >
+        <LogOut className="h-4 w-4" aria-hidden="true" />
+        Leave course
+      </Button>
+      {leave.isError && <FormError>{leave.error.message}</FormError>}
+    </>
+  );
+}
 
 function CourseAssignments({ course }) {
   const { data, isPending, isError, error } = useAssignments(course.id);
@@ -20,6 +53,7 @@ function CourseAssignments({ course }) {
             icon={MessageSquare}
             title={course.title}
             subtitle={`${course.teacher_name}, ${plural(course.assignment_count, "assignment")}`}
+            right={<LeaveButton course={course} />}
           />
           {isPending && <LoadingState />}
           {isError && <p className="px-7 py-5 text-sm text-bad">{error.message}</p>}
