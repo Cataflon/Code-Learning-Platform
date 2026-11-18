@@ -23,6 +23,7 @@ class MaterialRead(BaseModel):
     original_filename: str
     size_bytes: int
     page_count: int
+    text_pages: int = 0  # pages with searchable text; 0 = scanned PDF
     created_at: datetime
     used_in: list[MaterialUsage] = []
 

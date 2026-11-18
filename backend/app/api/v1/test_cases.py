@@ -1,7 +1,7 @@
 from fastapi import APIRouter, status
 
 from app.core.deps import CurrentUser, DbSession, MemberAssignment, OwnedAssignment, OwnedTestCase
-from app.models import Role
+from app.models import ReviewStatus, Role
 from app.schemas.assignment import (
     TestCaseCreate,
     TestCasePublicRead,
@@ -17,8 +17,14 @@ router = APIRouter(tags=["test-cases"])
     "/assignments/{assignment_id}/test-cases",
     response_model=list[TestCaseRead] | list[TestCasePublicRead],
 )
-def list_test_cases(assignment: MemberAssignment, db: DbSession, user: CurrentUser):
-    test_cases = test_case_service.list_test_cases(db, assignment, user)
+def list_test_cases(
+    assignment: MemberAssignment,
+    db: DbSession,
+    user: CurrentUser,
+    review: ReviewStatus | None = None,
+):
+    """``review=draft|approved`` filters the teacher's list; students only see approved tests."""
+    test_cases = test_case_service.list_test_cases(db, assignment, user, review)
     if user.role != Role.teacher:
         return [TestCasePublicRead.model_validate(test_case) for test_case in test_cases]
     links = material_service.test_case_links(db, [test_case.id for test_case in test_cases])

@@ -65,6 +65,11 @@ class TooManyRequestsError(DomainError):
     code = "too_many_requests"
 
 
+class ServiceUnavailableError(DomainError):
+    status_code = 503
+    code = "service_unavailable"
+
+
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(DomainError)
     async def handle_domain_error(_: Request, exc: DomainError) -> JSONResponse:

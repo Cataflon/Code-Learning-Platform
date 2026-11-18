@@ -58,7 +58,7 @@ def _check_min_interval(db: Session, student: User, assignment: Assignment) -> N
 
 
 def create_submission(db: Session, student: User, assignment: Assignment, code: str) -> Submission:
-    if not assignment.test_cases:
+    if not assignment.approved_tests:
         raise InvalidDataError("This assignment has no tests yet")
     if assignment.status == "closed":
         raise ConflictError("The deadline for this assignment has passed")
@@ -71,7 +71,7 @@ def create_submission(db: Session, student: User, assignment: Assignment, code: 
         code=code,
         language=assignment.language,
         status=SubmissionStatus.queued,
-        total_count=len(assignment.test_cases),
+        total_count=len(assignment.approved_tests),
         created_at=datetime.now(UTC),
     )
     db.add(submission)
@@ -87,7 +87,7 @@ def evaluate_submission(db: Session, submission: Submission, runner: Runner) -> 
     Any unexpected failure ends in status ``error``; a submission is never left ``running``.
     """
     assignment = submission.assignment
-    test_cases = list(assignment.test_cases)
+    test_cases = assignment.approved_tests  # drafts never count (Step 9)
     limits = Limits(
         time_limit_ms=assignment.time_limit_ms, memory_limit_mb=assignment.memory_limit_mb
     )
@@ -194,7 +194,7 @@ def hidden_labels(test_cases: list[TestCase]) -> dict[int, str]:
 
 def _visible_tests(submission: Submission) -> list[TestCase]:
     """While running: every test (pending ones included). Afterwards: only the tests that ran."""
-    test_cases = list(submission.assignment.test_cases)
+    test_cases = submission.assignment.approved_tests
     if submission.status in (SubmissionStatus.queued, SubmissionStatus.running):
         return test_cases
     ran = {result.test_case_id for result in submission.results}
@@ -204,7 +204,7 @@ def _visible_tests(submission: Submission) -> list[TestCase]:
 def get_visible_results(submission: Submission, viewer: User) -> list[TestResultRead]:
     by_test = {result.test_case_id: result for result in submission.results}
     test_cases = _visible_tests(submission)
-    labels = hidden_labels(list(submission.assignment.test_cases))
+    labels = hidden_labels(submission.assignment.approved_tests)
     is_teacher = viewer.role == Role.teacher
     items = []
     for test_case in test_cases:

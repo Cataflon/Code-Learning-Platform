@@ -43,6 +43,8 @@ class Material(Base):
     preview_filename: Mapped[str | None] = mapped_column(String(64), nullable=True)  # PDF of a PPTX
     size_bytes: Mapped[int] = mapped_column(Integer)
     page_count: Mapped[int] = mapped_column(Integer)
+    # Pages with extracted text (Step 9); 0 = a scanned PDF, linked to tests by hand only.
+    text_pages: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     uploaded_by: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

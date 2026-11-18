@@ -230,7 +230,7 @@ def assignment_stats(db: Session, assignment: Assignment) -> AssignmentStats:
         )
     }
     tests = []
-    for test_case in assignment.test_cases:
+    for test_case in assignment.approved_tests:
         row = per_test.get(test_case.id)
         total, passed = (row.total, row.passed) if row else (0, 0)
         tests.append(

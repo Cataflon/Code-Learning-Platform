@@ -1,7 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile, status
 from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.deps import (
     CurrentUser,
@@ -17,6 +18,7 @@ from app.core.deps import (
     TeacherUser,
     ViewableSubmission,
 )
+from app.db.session import get_background_session_factory
 from app.models import MaterialCategory
 from app.schemas.material import (
     LearnCourse,
@@ -63,6 +65,8 @@ def upload_material(
     db: DbSession,
     store: Store,
     converter: Annotated[Converter, Depends(get_converter)],
+    background: BackgroundTasks,
+    session_factory: Annotated[sessionmaker[Session], Depends(get_background_session_factory)],
     file: Annotated[UploadFile, File()],
     title: Annotated[str, Form(max_length=200)] = "",
     category: Annotated[MaterialCategory, Form()] = MaterialCategory.lecture,
@@ -70,6 +74,10 @@ def upload_material(
     """A PDF or a PPTX (multipart). A PPTX is converted to PDF before the answer, synchronously."""
     material = material_service.upload_material(
         db, course, user, file.file, file.filename, title, category, store, converter
+    )
+    # The page text for the AI linker is extracted after the answer (Step 9).
+    background.add_task(
+        material_service.extract_pages_in_background, material.id, session_factory, store
     )
     return material_service.material_read(db, material, user)
 
@@ -139,3 +147,10 @@ def set_test_case_materials(items: list[MaterialLinkIn], test_case: OwnedTestCas
 def recommendations(submission: ViewableSubmission, db: DbSession):
     """What to review for the failed tests of a submission; computed on demand."""
     return material_service.recommendations_for(db, submission)
+
+
+@router.post("/materials/{material_id}/reindex", response_model=MaterialRead)
+def reindex_material(material: OwnedMaterial, user: CurrentUser, db: DbSession, store: Store):
+    """Extract the page text again (for materials uploaded before Step 9)."""
+    material_service.extract_pages(db, material, store)
+    return material_service.material_read(db, material, user)
