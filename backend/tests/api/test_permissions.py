@@ -124,6 +124,16 @@ MATRIX = [
     ("member", "GET", COURSE + "/stats", None, 403),
     ("other_teacher", "GET", COURSE + "/stats", None, 404),
     ("owner", "GET", COURSE + "/stats", None, 200),
+    # --- concept reports
+    ("anonymous", "GET", COURSE + "/reports/concepts/me", None, 401),
+    ("member", "GET", COURSE + "/reports/concepts/me", None, 200),
+    ("outsider", "GET", COURSE + "/reports/concepts/me", None, 404),
+    ("owner", "GET", COURSE + "/reports/concepts/me", None, 403),
+    ("other_teacher", "GET", COURSE + "/reports/concepts/me", None, 404),
+    ("anonymous", "GET", COURSE + "/reports/concepts", None, 401),
+    ("member", "GET", COURSE + "/reports/concepts", None, 403),
+    ("other_teacher", "GET", COURSE + "/reports/concepts", None, 404),
+    ("owner", "GET", COURSE + "/reports/concepts", None, 200),
 ]
 
 

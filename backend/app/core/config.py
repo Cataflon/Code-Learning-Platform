@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     # Minimum time between two submissions of one student to one assignment (else 429).
     min_submission_interval_s: int = 5
 
+    # Concept report levels (Step 7): below the first is "review", from the second "mastered".
+    concept_review_below: float = 0.5
+    concept_mastered_from: float = 0.8
+
     @model_validator(mode="after")
     def _subprocess_runner_only_in_dev(self) -> Self:
         # SubprocessRunner is not a sandbox: refuse to start with it anywhere but dev.

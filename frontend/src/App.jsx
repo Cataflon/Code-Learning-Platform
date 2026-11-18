@@ -10,11 +10,13 @@ import CoursesPage from "./pages/CoursesPage.jsx";
 import CoursePage from "./pages/CoursePage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
+import ConceptReport from "./pages/ConceptReport.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import RegisterPage from "./pages/RegisterPage.jsx";
 import StatusPage from "./pages/StatusPage.jsx";
 import StudentDashboard from "./pages/StudentDashboard.jsx";
 import AssignmentEditor from "./pages/teacher/AssignmentEditor.jsx";
+import ClassConceptReport from "./pages/teacher/ClassConceptReport.jsx";
 import SubmissionsPage from "./pages/teacher/SubmissionsPage.jsx";
 import TeacherCoursesPage from "./pages/teacher/TeacherCoursesPage.jsx";
 
@@ -46,9 +48,11 @@ export function AppRoutes() {
           <Route element={<ProtectedRoute roles={["student"]} />}>
             <Route path="/dashboard" element={<StudentDashboard />} />
             <Route path="/assignments/:assignmentId" element={<AssignmentPage />} />
+            <Route path="/report" element={<ConceptReport />} />
           </Route>
           <Route element={<ProtectedRoute roles={["teacher"]} />}>
             <Route path="/courses/:courseId" element={<CoursePage />} />
+            <Route path="/courses/:courseId/report" element={<ClassConceptReport />} />
             <Route path="/teacher/assignments/:assignmentId/edit" element={<AssignmentEditor />} />
             <Route
               path="/teacher/assignments/:assignmentId/submissions"
