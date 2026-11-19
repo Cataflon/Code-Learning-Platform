@@ -1,6 +1,11 @@
-import { Check, Clock, Loader2, X } from "lucide-react";
+// One test of a submission, laid out as in the 8-bit prototype: a square, the name and its
+// concept, the verdict and the time. A failed test explains what went wrong underneath and, when
+// the course has one, links the page to read.
+
+import { Link } from "react-router-dom";
 
 import { Chip } from "./ui.jsx";
+import { verdictClass, verdictLabel } from "./VerdictSquares.jsx";
 
 const FAILURE_TEXT = {
   wrong_answer: "Your output differs from the expected one.",
@@ -12,64 +17,61 @@ const FAILURE_TEXT = {
 
 function Block({ label, text }) {
   return (
-    <div className="min-w-0 border border-edge bg-black/35 px-3 py-2">
-      <div className="text-xs text-ink-3">{label}</div>
-      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-sm">
-        {text === "" ? "(empty)" : text}
-      </pre>
+    <div className="io" style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
+      <div>
+        <span>{label}</span>
+        <pre className="max-h-40 overflow-auto">{text === "" ? "(empty)" : text}</pre>
+      </div>
     </div>
   );
 }
 
 /**
- * One test of a submission: verdict chip, name, concept chips and runtime.
- * `running` marks the test that is being executed right now.
+ * `running` marks the test that is being executed right now; `material` is the page to read
+ * when this test failed ({ to, label }), from the recommendations of the submission.
  */
-export default function TestResultRow({ result, running = false }) {
+export default function TestResultRow({ result, running = false, material = null }) {
   const { verdict } = result;
   const passed = verdict === "passed";
   const failed = verdict != null && !passed;
 
-  let badge;
-  if (passed) badge = <Chip tone="pass" icon={Check}>Passed</Chip>;
-  else if (failed) badge = <Chip tone="fail" icon={X}>Failed</Chip>;
-  else if (running) badge = <Chip tone="info" icon={Loader2} className="[&>svg]:animate-spin">Running</Chip>;
-  else badge = <Chip tone="neutral" icon={Clock}>Waiting</Chip>;
+  let chip;
+  if (passed) chip = <Chip tone="pass">Passed</Chip>;
+  else if (failed) chip = <Chip tone="fail">{verdictLabel(verdict)}</Chip>;
+  else if (running) chip = <Chip tone="info">Running</Chip>;
+  else chip = <Chip tone="neutral">Waiting</Chip>;
 
   // Content of public tests only; for hidden tests the API sends nothing to show.
   const hasDetails = failed && result.expected_output != null;
 
   return (
-    <li className={`border-t border-edge px-7 py-4 ${failed ? "bg-bad/15" : ""}`}>
-      <div className="flex flex-wrap items-center gap-3">
-        {badge}
-        <span className="font-semibold">{result.name}</span>
-        {result.is_hidden && <Chip tone="neutral">hidden</Chip>}
-        <span className="ml-auto flex flex-wrap items-center gap-2">
-          {result.concepts.map((concept) => (
-            <Chip key={concept}>{concept}</Chip>
-          ))}
-          <span className="w-16 text-right text-sm text-ink-3">
-            {result.runtime_ms != null ? `${result.runtime_ms} ms` : ""}
-          </span>
-        </span>
-      </div>
+    <li className={`test ${failed ? "bg-bad/10" : ""}`}>
+      <i className={`sq ${running ? "run" : verdictClass(verdict)}`} aria-hidden="true" />
+      <span className="min-w-0">
+        <b>{result.name}</b>
+        {result.concepts.length > 0 && <span className="concept"> {result.concepts.join(", ")}</span>}
+      </span>
+      {chip}
+      <span className="ms">{result.runtime_ms != null ? `${result.runtime_ms} ms` : ""}</span>
       {failed && (
-        <p className="mt-3 text-sm text-bad">
-          {FAILURE_TEXT[verdict] ?? "This test failed."}
-          {result.hint && <> Hint from your teacher: {result.hint}</>}
-        </p>
-      )}
-      {hasDetails && (
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
-          <Block label="Input" text={result.input_data ?? ""} />
-          <Block label="Expected output" text={result.expected_output ?? ""} />
-          <Block label="Your output" text={result.actual_output ?? ""} />
-        </div>
-      )}
-      {failed && result.stderr && (
-        <div className="mt-3">
-          <Block label="Error output" text={result.stderr} />
+        <div className="hint">
+          <p>
+            {FAILURE_TEXT[verdict] ?? "This test failed."}
+            {result.hint && <> Hint from your teacher: {result.hint}</>}
+          </p>
+          {hasDetails && (
+            <div className="out-grid">
+              <Block label="Input" text={result.input_data ?? ""} />
+              <Block label="Expected output" text={result.expected_output ?? ""} />
+              <Block label="Your output" text={result.actual_output ?? ""} />
+            </div>
+          )}
+          {result.stderr && <Block label="Error output" text={result.stderr} />}
+          {material && (
+            <Link to={material.to} className="warn-link justify-self-start">
+              {material.label}
+            </Link>
+          )}
         </div>
       )}
     </li>
