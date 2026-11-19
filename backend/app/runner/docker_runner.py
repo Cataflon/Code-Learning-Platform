@@ -41,6 +41,7 @@ class DockerRunner:
         pids_limit: int = 64,
         startup_margin_ms: int = 2000,
         client: docker.DockerClient | None = None,
+        work_dir: str | None = None,
     ) -> None:
         self.image = image
         self.cpus = cpus
@@ -48,6 +49,10 @@ class DockerRunner:
         # Wall-clock allowance for creating and starting the container, on top of the limit.
         self.startup_margin_ms = startup_margin_ms
         self._client = client
+        # Parent folder of the per-run temporary folders; None = the system temp folder.
+        self.work_dir = work_dir or None
+        if self.work_dir:
+            os.makedirs(self.work_dir, exist_ok=True)
 
     @property
     def client(self) -> docker.DockerClient:
@@ -56,7 +61,7 @@ class DockerRunner:
         return self._client
 
     def run(self, code: str, stdin: str, limits: Limits) -> RunResult:
-        with tempfile.TemporaryDirectory(prefix="autograder-") as workdir:
+        with tempfile.TemporaryDirectory(prefix="autograder-", dir=self.work_dir) as workdir:
             self._write_files(Path(workdir), code, stdin)
             container = self.client.containers.create(
                 self.image,

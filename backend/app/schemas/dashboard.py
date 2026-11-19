@@ -29,6 +29,7 @@ class DashboardAssignment(BaseModel):
     best_score: int | None  # None = not started
     last_verdicts: list[Verdict | None]  # squares of the latest attempt, in test order
     last_submission_status: SubmissionStatus | None
+    last_submission_id: int | None = None  # for the recommended pages of the hero card
 
 
 class DashboardSubmission(BaseModel):

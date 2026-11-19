@@ -1,7 +1,7 @@
 // Small HTTP client: adds the token, parses JSON and turns error responses into ApiError.
 
 const TOKEN_KEY = "autograder.token";
-export const API_PREFIX = "/api/v1";
+const API_PREFIX = "/api/v1";
 
 let onUnauthorized = () => {};
 

@@ -63,21 +63,24 @@ test("renders the dashboard with assignments, scores and the next deadline", asy
 
   renderApp(<StudentDashboard />, { user: STUDENT });
 
-  expect(await screen.findByRole("heading", { name: "Welcome back, Andrei!" })).toBeInTheDocument();
+  expect(await screen.findByText(/Andrei\. Your next deadline:/)).toBeInTheDocument();
+  expect(screen.getByRole("heading", { level: 1, name: "Digit sum" })).toBeInTheDocument();
   expect(screen.getByText("88%")).toBeInTheDocument();
-  expect(screen.getByText(/Next deadline, tomorrow at/)).toBeInTheDocument();
-  expect(screen.getByText("3 of 4 tests pass in your last attempt")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Continue" })).toHaveAttribute("href", "/assignments/1");
+  expect(screen.getByText(/due tomorrow at/)).toBeInTheDocument();
+  expect(screen.getByRole("timer")).toHaveTextContent(/\d\d:\d\d:\d\d left/);
+  expect(screen.getByText("3 of 4 tests pass.")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: /Continue solving/ })).toHaveAttribute("href", "/assignments/1");
+  expect(screen.getByRole("link", { name: /Concepts to review/ })).toHaveAttribute("href", "/report");
 
   const table = screen.getByRole("table");
   expect(within(table).getByText("Binary search")).toBeInTheDocument();
-  expect(within(table).getByText("Not started")).toBeInTheDocument();
+  expect(within(table).getByText("New")).toBeInTheDocument();
   expect(within(table).getByText("75%")).toBeInTheDocument();
   expect(within(table).getByText("100%")).toBeInTheDocument();
   expect(within(table).getByText("Submitted")).toBeInTheDocument();
 
   expect(screen.getByText("Negative numbers")).toBeInTheDocument();
-  expect(screen.getByText("1 of 3 tests")).toBeInTheDocument();
+  expect(screen.getByText("1 of 3 tests pass")).toBeInTheDocument();
 });
 
 test("renders empty states when the student has nothing yet", async () => {
@@ -96,8 +99,8 @@ test("renders empty states when the student has nothing yet", async () => {
   expect(await screen.findByText("No assignments yet")).toBeInTheDocument();
   expect(screen.getByText("Nothing to review right now.")).toBeInTheDocument();
   expect(screen.getByText("Your submissions will appear here.")).toBeInTheDocument();
-  expect(screen.getByText("Nothing is due this week.")).toBeInTheDocument();
-  expect(screen.queryByText(/Next deadline/)).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "All caught up" })).toBeInTheDocument();
+  expect(screen.queryByText(/Your next deadline/)).not.toBeInTheDocument();
 });
 
 test("shows the error state when the request fails", async () => {
@@ -106,6 +109,42 @@ test("shows the error state when the request fails", async () => {
   renderApp(<StudentDashboard />, { user: STUDENT });
 
   expect(await screen.findByRole("alert")).toHaveTextContent("Database is down");
+});
+
+test("the hero names the failing test and links the recommended pages", async () => {
+  mockApi({
+    "GET /me/dashboard": {
+      ...DASHBOARD,
+      assignments: [assignment({ last_submission_id: 9 })],
+    },
+    "GET /submissions/9/recommendations": {
+      submission_id: 9,
+      assignment_id: 1,
+      failed_tests: [{ test_case_id: 4, name: "Hidden test #1", is_hidden: true, concepts: ["Negative numbers"] }],
+      materials: [
+        {
+          material_id: 5,
+          title: "Lecture 4",
+          category: "lecture",
+          file_type: "pdf",
+          page_count: 28,
+          pages: "12-15",
+          first_page: 12,
+          test_count: 1,
+          tests: ["Hidden test #1"],
+          from_assignment: false,
+        },
+      ],
+    },
+  });
+
+  renderApp(<StudentDashboard />, { user: STUDENT });
+
+  expect(await screen.findByText(/“Hidden test #1” fails on negative numbers\./)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Read Lecture 4, pages 12-15" })).toHaveAttribute(
+    "href",
+    "/learn/materials/5?page=12&rec=12-15",
+  );
 });
 
 test("nextDeadline skips solved, closed and past assignments", () => {

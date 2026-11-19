@@ -1,3 +1,14 @@
+# Two ways to start (Step 10, decision D10):
+#
+#   docker compose up -d                       only the database; backend and frontend run on
+#                                              your machine (the default for development)
+#   docker compose --profile demo up --build   everything in containers, for a demo from zero:
+#                                              http://localhost:8080
+#
+# The demo backend talks to Docker through /var/run/docker.sock to start the sandboxes. Access
+# to that socket is root on the host: use the demo profile only on your own computer, never on
+# a server that others can reach.
+
 services:
   db:
     image: postgres:16
@@ -16,5 +27,49 @@ services:
       timeout: 3s
       retries: 10
 
+  # Builds the image student code runs in; the container itself exits at once.
+  sandbox:
+    profiles: ["demo"]
+    build: ./sandbox
+    image: autograder-python:latest
+    entrypoint: ["true"]
+    network_mode: none
+
+  backend:
+    profiles: ["demo"]
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+      sandbox:
+        condition: service_completed_successfully
+    # Optional: AI keys and other local settings (never committed).
+    env_file:
+      - path: backend/.env
+        required: false
+    environment:
+      ENV: demo
+      DATABASE_URL: postgresql+psycopg://autograder:autograder@db:5432/autograder
+      JWT_SECRET: ${JWT_SECRET:-demo-only-secret-change-me-0123456789abcdef}
+      RUNNER: docker
+      UPLOAD_DIR: /data/uploads
+      # The sandbox mounts its files from here: the same path must exist on the Docker host.
+      SANDBOX_WORK_DIR: /tmp/autograder-runs
+      SEED_DEMO: ${SEED_DEMO:-true}
+    volumes:
+      - uploads:/data/uploads
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/autograder-runs:/tmp/autograder-runs
+
+  frontend:
+    profiles: ["demo"]
+    build: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+
 volumes:
   db_data:
+  uploads:

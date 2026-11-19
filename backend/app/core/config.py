@@ -55,8 +55,19 @@ class Settings(BaseSettings):
     sandbox_pids_limit: int = 64
     sandbox_startup_margin_ms: int = 2000
     max_concurrent_runs: int = 2
+    # Where the runner writes main.py and input.txt before mounting them in the sandbox.
+    # Empty = the system temp folder. When the backend itself runs in a container (compose
+    # profile "demo"), this folder must exist at the same path on the Docker host.
+    sandbox_work_dir: str = ""
     # Minimum time between two submissions of one student to one assignment (else 429).
     min_submission_interval_s: int = 5
+
+    # Logging and abuse limits (Step 10)
+    log_level: str = "INFO"
+    rate_limit_enabled: bool = True
+    rate_limit_login_per_minute: int = 10  # sign-in and registration, per IP address
+    rate_limit_submissions_per_minute: int = 20  # per student, across assignments
+    rate_limit_uploads_per_10_minutes: int = 20  # material uploads, per teacher
 
     # Concept report levels (Step 7): below the first is "review", from the second "mastered".
     concept_review_below: float = 0.5

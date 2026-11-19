@@ -12,9 +12,11 @@ Idempotent: running it again changes nothing. Run with ``python -m scripts.seed_
 It also adds two materials to the "Digit sum" course of scripts/seed.py (Step 8): a PDF lecture
 linked to the whole assignment and, pages 12-15, to its hidden test, so the recommendations popup
 shows up after a wrong submission; and a PPTX lab, only when LibreOffice can convert it.
-Step 10 adds the three-week history.
+Step 10 adds five more students (eight in all) and three weeks of earlier attempts, so the
+activity grid, the teacher's statistics and the submissions list look like a real class.
 """
 
+import random
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
@@ -80,6 +82,16 @@ STUDENTS = [
     ("bogdan.weak@student.utcluj.ro", "Bogdan Rus", {"Recursion", "Lists", "Loops", "Edge cases"}),
     ("carmen.strong@student.utcluj.ro", "Carmen Dan", set()),
 ]
+
+# Step 10: five more students, so the class has eight.
+EXTRA_STUDENTS = [
+    ("david.steady@student.utcluj.ro", "David Ilie", {"Edge cases"}),
+    ("elena.loops@student.utcluj.ro", "Elena Stan", {"Loops"}),
+    ("florin.io@student.utcluj.ro", "Florin Mihai", {"Input and output", "Edge cases"}),
+    ("gabriela.top@student.utcluj.ro", "Gabriela Toma", set()),
+    ("horia.late@student.utcluj.ro", "Horia Vasile", {"Recursion", "Lists"}),
+]
+HISTORY_DAYS = 21
 
 DEMO_CODE = "# demo submission\nprint(input())\n"
 
@@ -183,6 +195,41 @@ def seed_demo(db: Session) -> Course:
             _store_submission(db, student.id, assignment, _verdicts(tests, weak, False), latest)
     db.commit()
     return course
+
+
+def seed_history(db: Session, course: Course) -> int:
+    """Eight students with attempts spread over the last three weeks (idempotent).
+
+    The new students get a latest attempt per assignment in the last four days, like the first
+    three; every student also gets one to three older, weaker attempts between 5 and 21 days
+    ago. A fixed random seed keeps the data the same on every machine.
+    """
+    first_extra = get_or_create_user(db, *EXTRA_STUDENTS[0][:2], Role.student)
+    if db.get(Enrollment, (first_extra.id, course.id)) is not None:
+        return 0
+    rng = random.Random(2026)
+    now = datetime.now(UTC)
+    assignments = sorted(course.assignments, key=lambda assignment: assignment.id)
+    created = 0
+    everyone = [(email, name, weak, False) for email, name, weak in STUDENTS]
+    everyone += [(email, name, weak, True) for email, name, weak in EXTRA_STUDENTS]
+    for index, (email, full_name, weak, is_new) in enumerate(everyone):
+        student = get_or_create_user(db, email, full_name, Role.student)
+        if is_new:
+            db.add(Enrollment(user_id=student.id, course_id=course.id))
+        for number, assignment in enumerate(assignments):
+            tests = list(assignment.test_cases)
+            for _ in range(rng.randint(1, 3)):
+                when = now - timedelta(days=rng.uniform(5, HISTORY_DAYS), hours=rng.randint(0, 12))
+                worse = weak | {rng.choice(CONCEPTS)}
+                _store_submission(db, student.id, assignment, _verdicts(tests, worse, True), when)
+                created += 1
+            if is_new:
+                latest = now - timedelta(days=4 - number, hours=index + 1)
+                _store_submission(db, student.id, assignment, _verdicts(tests, weak, False), latest)
+                created += 1
+    db.commit()
+    return created
 
 
 LECTURE_TITLE = "Lecture 4: Loops and digit extraction"
@@ -337,10 +384,13 @@ def seed_materials(db: Session, store=None, converter=None) -> list[str]:
 def main() -> None:
     with get_session_factory()() as db:
         course = seed_demo(db)
+        added = seed_history(db, course)
+        if added:
+            print(f"Added {added} submissions of history (eight students, three weeks)")
         for note in seed_materials(db):
             print(note)
         print(f"Demo course ready: '{course.title}', join code {course.join_code}")
-        print("Students: " + ", ".join(email for email, _, _ in STUDENTS))
+        print("Students: " + ", ".join(email for email, _, _ in STUDENTS + EXTRA_STUDENTS))
         print(f"Teacher: {TEACHER_EMAIL}; password for every account: {SEED_PASSWORD}")
 
 

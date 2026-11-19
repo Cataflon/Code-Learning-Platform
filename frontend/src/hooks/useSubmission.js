@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { getSubmission } from "../api/submissions.js";
 
-export const POLL_INTERVAL_MS = 1000;
+const POLL_INTERVAL_MS = 1000;
 
 export function isFinal(status) {
   return status === "done" || status === "error";

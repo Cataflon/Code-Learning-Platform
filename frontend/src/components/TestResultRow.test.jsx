@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { expect, test } from "vitest";
 
 import TestResultRow from "./TestResultRow.jsx";
@@ -20,9 +21,11 @@ const BASE = {
 
 function renderRow(overrides = {}, props = {}) {
   return render(
-    <ul>
-      <TestResultRow result={{ ...BASE, ...overrides }} {...props} />
-    </ul>,
+    <MemoryRouter>
+      <ul>
+        <TestResultRow result={{ ...BASE, ...overrides }} {...props} />
+      </ul>
+    </MemoryRouter>,
   );
 }
 
@@ -39,7 +42,7 @@ test("a passed test shows the verdict, the concept and the runtime", () => {
 test("a failed public test shows the reason and the outputs", () => {
   renderRow({ verdict: "wrong_answer", actual_output: "11\n" });
 
-  expect(screen.getByText("Failed")).toBeInTheDocument();
+  expect(screen.getByText("Wrong answer")).toBeInTheDocument();
   expect(screen.getByText(/Your output differs from the expected one/)).toBeInTheDocument();
   expect(screen.getByText("Expected output")).toBeInTheDocument();
   expect(screen.getByText("Your output")).toBeInTheDocument();
@@ -57,7 +60,7 @@ test("a failed hidden test shows the hint but no test content", () => {
     stderr: null,
   });
 
-  expect(screen.getByText("hidden")).toBeInTheDocument();
+  expect(screen.getByText("Hidden test #1")).toBeInTheDocument();
   expect(screen.getByText(/Hint from your teacher: Check what happens to the sign/)).toBeInTheDocument();
   expect(screen.queryByText("Expected output")).not.toBeInTheDocument();
 });
@@ -70,6 +73,18 @@ test.each([
   renderRow({ verdict });
 
   expect(screen.getByText(text)).toBeInTheDocument();
+});
+
+test("a failed test links the page the course recommends for it", () => {
+  renderRow(
+    { verdict: "wrong_answer" },
+    { material: { to: "/learn/materials/5?page=12&rec=12-15", label: "Read Lecture 4, pages 12-15" } },
+  );
+
+  expect(screen.getByRole("link", { name: "Read Lecture 4, pages 12-15" })).toHaveAttribute(
+    "href",
+    "/learn/materials/5?page=12&rec=12-15",
+  );
 });
 
 test("a test without a verdict is waiting, or running when it is the current one", () => {

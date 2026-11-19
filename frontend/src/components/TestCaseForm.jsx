@@ -6,7 +6,7 @@ import { Card, Chip, IconBadge, inputClass } from "./ui.jsx";
 let nextKey = 1;
 
 /** A blank test row. `key` is a client-side identity for rows that have no id yet. */
-export function emptyTest() {
+function emptyTest() {
   return {
     key: `new-${nextKey++}`,
     name: "",
@@ -218,7 +218,7 @@ function TestRow({ test, index, concepts, onChange, onRemove, onCreateConcept })
         {test.is_hidden && (
           <p className="flex items-center gap-3 text-sm text-pink">
             <Eye className="h-4 w-4" aria-hidden="true" />
-            Students never see this test's input or expected output.
+            Students never see this test’s input or expected output.
           </p>
         )}
         <div className="grid gap-5 md:grid-cols-2">

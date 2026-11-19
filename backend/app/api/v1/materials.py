@@ -18,6 +18,7 @@ from app.core.deps import (
     TeacherUser,
     ViewableSubmission,
 )
+from app.core.rate_limit import limit_uploads
 from app.db.session import get_background_session_factory
 from app.models import MaterialCategory
 from app.schemas.material import (
@@ -58,6 +59,7 @@ def list_materials(course: MemberCourse, user: CurrentUser, db: DbSession):
     "/courses/{course_id}/materials",
     response_model=MaterialRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(limit_uploads)],
 )
 def upload_material(
     course: OwnedCourse,

@@ -87,7 +87,7 @@ export function AppRoutes() {
   );
 }
 
-export function createQueryClient() {
+function createQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {

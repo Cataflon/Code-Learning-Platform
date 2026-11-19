@@ -9,6 +9,7 @@ import pytest
 from pydantic import SecretStr
 from sqlalchemy import select
 
+from app.ai import prompts
 from app.ai.client import FakeLLMClient, InvalidJSONError
 from app.core.config import get_settings
 from app.models import (
@@ -318,9 +319,11 @@ def test_without_a_solution_the_ai_writes_it_and_a_second_one_checks_it(
     simple, zero = drafts(db_session, statement_setup["assignment"])
     assert (simple.expected_output, zero.expected_output) == ("10\n", "0\n")
     assert simple.ai_check_output is None and zero.ai_check_output is None
-    author_system, author_prompt, author_schema = llm.calls[0]
+    by_system = {system: (user, schema) for system, user, schema in llm.calls}
+    author_prompt, author_schema = by_system[prompts.AUTHOR_SYSTEM]
     assert "reference_solution" in str(author_schema) and "<task_statement>" in author_prompt
-    check_system, check_prompt, _ = llm.calls[1]
+    check_system = prompts.CHECK_SYSTEM
+    check_prompt, _ = by_system[check_system]
     assert "independently" in check_system
     assert AI_SOLUTION not in check_prompt  # the check never sees the first solution
 

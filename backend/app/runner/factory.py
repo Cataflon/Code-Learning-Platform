@@ -22,6 +22,7 @@ def build_runner(settings: Settings) -> Runner:
         cpus=settings.sandbox_cpus,
         pids_limit=settings.sandbox_pids_limit,
         startup_margin_ms=settings.sandbox_startup_margin_ms,
+        work_dir=settings.sandbox_work_dir,
     )
 
 

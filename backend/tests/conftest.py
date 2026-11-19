@@ -102,6 +102,16 @@ def no_real_ai_key(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def fresh_rate_limits():
+    """Every test starts with empty rate-limit counters."""
+    from app.core import rate_limit
+
+    rate_limit.reset_all()
+    yield
+    rate_limit.reset_all()
+
+
+@pytest.fixture(autouse=True)
 def no_submission_interval(monkeypatch):
     """Tests submit in quick succession; the 429 rule is switched on only where it is tested."""
     monkeypatch.setattr(get_settings(), "min_submission_interval_s", 0)

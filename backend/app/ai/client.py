@@ -11,6 +11,7 @@
 
 import json
 import re
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -218,9 +219,11 @@ class OpenAICompatibleClient:
 
 @dataclass
 class FakeLLMClient:
-    """Deterministic stand-in: returns the scripted answers in order (or calls a function).
+    """Deterministic stand-in: returns scripted answers (or calls a function).
 
-    An item that is an exception is raised instead. Every call is recorded for assertions.
+    Each call takes the first unused scripted answer that has the keys the schema requires,
+    so two requests made at the same time still get the right answers. An item that is an
+    exception is raised instead (it matches any request). Every call is recorded.
     """
 
     script: list[dict[str, Any] | Exception] | Callable[[str, str, dict], dict] = field(
@@ -228,15 +231,26 @@ class FakeLLMClient:
     )
     calls: list[tuple[str, str, dict]] = field(default_factory=list)
     tokens: int = 100
+    _used: set[int] = field(default_factory=set, repr=False)
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    def _take(self, schema: dict[str, Any]) -> dict[str, Any] | Exception:
+        required = set(schema.get("required", []))
+        for index, answer in enumerate(self.script):
+            if index in self._used:
+                continue
+            if isinstance(answer, Exception) or required <= set(answer):
+                self._used.add(index)
+                return answer
+        raise LLMError("FakeLLMClient: no scripted answer left for this request")
 
     def complete_json(self, system: str, user: str, schema: dict[str, Any]) -> LLMResult:
-        self.calls.append((system, user, schema))
-        if callable(self.script):
-            answer = self.script(system, user, schema)
-        else:
-            if len(self.calls) > len(self.script):
-                raise LLMError("FakeLLMClient: no scripted answer left")
-            answer = self.script[len(self.calls) - 1]
+        with self._lock:
+            self.calls.append((system, user, schema))
+            if callable(self.script):
+                answer = self.script(system, user, schema)
+            else:
+                answer = self._take(schema)
         if isinstance(answer, Exception):
             raise answer
         return LLMResult(

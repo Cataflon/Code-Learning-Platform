@@ -42,7 +42,7 @@ function describe(assignment) {
 }
 
 /** Stacked bar: students who passed all tests, some tests, no test. */
-export function ResultBar({ buckets, submitted, enrolled }) {
+function ResultBar({ buckets, submitted, enrolled }) {
   const total = Math.max(1, submitted);
   const width = (count) => `${(count / total) * 100}%`;
   return (
@@ -132,7 +132,7 @@ function AssignmentsCard({ courseId }) {
                     </td>
                     <td className="w-64 px-3 py-5">
                       {isDraft ? (
-                        <span className="text-sm text-ink-3">Students can't see it yet.</span>
+                        <span className="text-sm text-ink-3">Students can’t see it yet.</span>
                       ) : (
                         <ResultBar
                           buckets={assignment.result_buckets ?? { full: 0, partial: 0, none: 0 }}

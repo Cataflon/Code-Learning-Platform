@@ -117,6 +117,7 @@ def student_dashboard(db: Session, student: User) -> StudentDashboard:
                 best_score=max(scores) if scores else None,
                 last_verdicts=_verdicts(latest) if latest else [],
                 last_submission_status=latest.status if latest else None,
+                last_submission_id=latest.id if latest else None,
             )
         )
 

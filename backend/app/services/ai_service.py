@@ -17,6 +17,7 @@ import re
 import threading
 import unicodedata
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 
 from pydantic import BaseModel, ValidationError
@@ -24,7 +25,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.ai import prompts
-from app.ai.client import InvalidJSONError, LLMClient, LLMError
+from app.ai.client import InvalidJSONError, LLMClient, LLMError, LLMResult
 from app.ai.schemas import (
     AuthoredResult,
     CheckSolution,
@@ -187,10 +188,15 @@ def recover_interrupted_jobs(db: Session) -> int:
     return len(stuck)
 
 
-def _ask[T: BaseModel](
-    llm: LLMClient, job: GenerationJob, system: str, user: str, schema: dict, model: type[T]
-) -> T:
-    """One request, checked with Pydantic; an invalid answer is asked for once more."""
+def _request[T: BaseModel](
+    llm: LLMClient, system: str, user: str, schema: dict, model: type[T]
+) -> tuple[T, list[LLMResult]]:
+    """One request, checked with Pydantic; an invalid answer is asked for once more.
+
+    Touches no database object, so it can run in another thread; the answers are returned
+    with the result so the caller can count their tokens on the job.
+    """
+    answers: list[LLMResult] = []
     for attempt in (1, 2):
         try:
             result = llm.complete_json(system, user, schema)
@@ -198,16 +204,29 @@ def _ask[T: BaseModel](
             if attempt == 2:
                 raise GenerationError("The model did not return a valid answer twice") from None
             continue
-        job.input_tokens += result.input_tokens
-        job.output_tokens += result.output_tokens
-        if result.model:
-            job.model = result.model[:64]  # a fallback model may have answered
+        answers.append(result)
         try:
-            return model.model_validate(result.data)
+            return model.model_validate(result.data), answers
         except ValidationError:
             if attempt == 2:
                 raise GenerationError("The model did not return a valid answer twice") from None
     raise AssertionError("unreachable")
+
+
+def _count(job: GenerationJob, answers: list[LLMResult]) -> None:
+    for result in answers:
+        job.input_tokens += result.input_tokens
+        job.output_tokens += result.output_tokens
+        if result.model:
+            job.model = result.model[:64]  # a fallback model may have answered
+
+
+def _ask[T: BaseModel](
+    llm: LLMClient, job: GenerationJob, system: str, user: str, schema: dict, model: type[T]
+) -> T:
+    value, answers = _request(llm, system, user, schema, model)
+    _count(job, answers)
+    return value
 
 
 def normalize_name(name: str) -> str:
@@ -249,16 +268,29 @@ def generate_tests(
     # 1. The model proposes the inputs; it writes the solution too when the teacher gave none.
     examples: list[StatementExample] = []
     if job.reference_by == "ai":
-        authored = _ask(
-            llm,
-            job,
-            prompts.AUTHOR_SYSTEM,
-            prompts.author_prompt(
-                assignment.description, *limits_args, concept_names, job.tests_requested
-            ),
-            prompts.AUTHOR_SCHEMA,
-            AuthoredResult,
-        )
+        # The second solution is written without seeing the first, so both requests are
+        # independent and run at the same time (the slower one sets the wait).
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            check_request = pool.submit(
+                _request,
+                llm,
+                prompts.CHECK_SYSTEM,
+                prompts.check_prompt(assignment.description, *limits_args),
+                prompts.CHECK_SCHEMA,
+                CheckSolution,
+            )
+            authored = _ask(
+                llm,
+                job,
+                prompts.AUTHOR_SYSTEM,
+                prompts.author_prompt(
+                    assignment.description, *limits_args, concept_names, job.tests_requested
+                ),
+                prompts.AUTHOR_SCHEMA,
+                AuthoredResult,
+            )
+            check, check_answers = check_request.result()
+        _count(job, check_answers)
         job.reference_code = authored.reference_solution
         tests = authored.tests
         # Only examples really written in the statement count (the model may not invent one).
@@ -268,15 +300,6 @@ def generate_tests(
             for example in authored.examples
             if _flat(example.input) in statement and _flat(example.output) in statement
         ]
-        # A second solution, written without seeing the first, cross-checks it.
-        check = _ask(
-            llm,
-            job,
-            prompts.CHECK_SYSTEM,
-            prompts.check_prompt(assignment.description, *limits_args),
-            prompts.CHECK_SCHEMA,
-            CheckSolution,
-        )
         job.check_code = check.solution
     else:
         result = _ask(

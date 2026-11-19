@@ -14,3 +14,17 @@ const BAR = {
 export function courseBarClass(color) {
   return BAR[color] ?? BAR.indigo;
 }
+
+// The same palette as CSS colours, for the dots and row accents of the 8-bit prototype.
+const VAR = {
+  indigo: "var(--course-violet)",
+  blue: "var(--course-blue)",
+  purple: "var(--course-lilac)",
+  green: "var(--ok)",
+  amber: "var(--warn)",
+  rose: "var(--bad)",
+};
+
+export function courseColorVar(color) {
+  return VAR[color] ?? VAR.indigo;
+}

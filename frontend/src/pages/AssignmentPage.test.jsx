@@ -108,12 +108,12 @@ test("shows the problem, the limits and the latest result", async () => {
   expect(await screen.findByRole("heading", { name: "Digit sum" })).toBeInTheDocument();
   expect(screen.getByText("sum of its digits")).toBeInTheDocument(); // Markdown rendered
   expect(screen.getByText("8 of 10 attempts left")).toBeInTheDocument();
-  expect(screen.getByText("2 s per test, 128 MB")).toBeInTheDocument();
+  expect(screen.getByText(/Limits: 2 s and 128 MB per test/)).toBeInTheDocument();
   expect(screen.getByText(/Some tests are hidden/)).toBeInTheDocument();
   expect(await screen.findByText("Result of attempt 2")).toBeInTheDocument();
   expect(screen.getByText("1 of 2 passed")).toBeInTheDocument();
   expect(screen.getByText(/Hint from your teacher: Check the sign/)).toBeInTheDocument();
-  expect(screen.getByText("This will be your second attempt")).toBeInTheDocument();
+  expect(screen.getByText(/This will be your second attempt/)).toBeInTheDocument();
 });
 
 test("submitting sends the code and shows the tests while they run", async () => {
@@ -154,7 +154,7 @@ test("submitting sends the code and shows the tests while they run", async () =>
     timeout: 4000,
   });
   expect(screen.getByText("Passed")).toBeInTheDocument();
-  expect(screen.getByText("Failed")).toBeInTheDocument();
+  expect(screen.getByText("Wrong answer")).toBeInTheDocument();
 });
 
 test("keeps the draft in localStorage", async () => {

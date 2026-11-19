@@ -14,7 +14,6 @@ import { Avatar, Button, Card, CardHeader, Chip, FormError, inputClass, PageHead
 import { formatDay } from "../../lib/format.js";
 
 const PAGE_SIZE = 25;
-const ROLE_TONE = { student: "info", teacher: "accent", admin: "pink" };
 
 function StatsLine() {
   const stats = useQuery({ queryKey: ["admin-stats"], queryFn: adminApi.getAdminStats });
