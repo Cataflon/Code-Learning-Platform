@@ -54,3 +54,28 @@ def test_seed_materials_links_the_lecture_to_the_hidden_test(
     )
     assert link.pages == "12-15"
     assert file_store.path(lecture.stored_filename).read_bytes().startswith(b"%PDF-")
+
+
+def test_seed_history_gives_eight_students_and_three_weeks_of_attempts(db_session):
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import func, select
+
+    from app.models import Enrollment, Submission
+    from scripts.seed_demo import seed_history
+
+    course = seed_demo(db_session)
+    added = seed_history(db_session, course)
+
+    assert added > 0
+    assert seed_history(db_session, course) == 0  # idempotent
+    students = db_session.scalar(
+        select(func.count()).select_from(Enrollment).where(Enrollment.course_id == course.id)
+    )
+    oldest = db_session.scalar(
+        select(func.min(Submission.created_at)).where(
+            Submission.assignment_id.in_([a.id for a in course.assignments])
+        )
+    )
+    assert students == 8
+    assert oldest < datetime.now(UTC) - timedelta(days=14)

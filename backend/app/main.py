@@ -24,6 +24,8 @@ from app.api.v1 import (
 )
 from app.core.config import get_settings
 from app.core.errors import register_error_handlers
+from app.core.logging import HEADER as REQUEST_ID_HEADER
+from app.core.logging import RequestIdMiddleware, configure_logging
 from app.db.session import get_background_session_factory
 from app.runner.factory import get_runner
 from app.services.ai_service import recover_interrupted_jobs
@@ -83,6 +85,7 @@ def remove_orphaned_sandboxes(app: FastAPI) -> None:
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    configure_logging(settings.log_level)
     app = FastAPI(title="Autograder API", version="0.1.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
@@ -90,7 +93,10 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=[REQUEST_ID_HEADER, "Retry-After"],
     )
+    # Added last, so it wraps everything: even a CORS rejection carries a request id.
+    app.add_middleware(RequestIdMiddleware)
     register_error_handlers(app)
     # /health lives outside /api/v1 on purpose (see the API contract).
     app.include_router(health.router)

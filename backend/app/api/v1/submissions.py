@@ -10,6 +10,7 @@ from app.core.deps import (
     StudentUser,
     ViewableSubmission,
 )
+from app.core.rate_limit import limit_submissions
 from app.db.session import get_background_session_factory
 from app.runner.base import Runner
 from app.runner.factory import get_run_slots, get_runner
@@ -26,6 +27,7 @@ router = APIRouter(tags=["submissions"])
     "/assignments/{assignment_id}/submissions",
     response_model=SubmissionRead,
     status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(limit_submissions)],
 )
 def create_submission(
     data: SubmissionCreate,
