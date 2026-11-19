@@ -6,6 +6,7 @@ checked for zip bombs before LibreOffice sees them; names on disk come from File
 """
 
 import contextlib
+import logging
 import re
 import shutil
 import tempfile
@@ -17,7 +18,9 @@ from typing import BinaryIO
 
 from pypdf import PdfReader
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.config import get_settings
 from app.core.errors import (
@@ -62,6 +65,8 @@ CHUNK = 1024 * 1024
 MAX_ZIP_ENTRIES = 2000
 MAX_UNZIPPED_BYTES = 200 * 1024 * 1024
 TITLE_MAX = 120
+
+logger = logging.getLogger(__name__)
 
 
 # --- reading and checking an upload ----------------------------------------------------------
@@ -596,5 +601,10 @@ def extract_pages_in_background(material_id: int, session_factory, store: FileSt
         material = db.get(Material, material_id)
         if material is not None:
             extract_pages(db, material, store)
+    except (StaleDataError, IntegrityError, OSError):
+        # The teacher deleted the material (rows or file) while its text was being read:
+        # nothing is left to index, which is not an error.
+        db.rollback()
+        logger.info("Material %s was deleted while its pages were being indexed", material_id)
     finally:
         db.close()
