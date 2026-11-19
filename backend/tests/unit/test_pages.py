@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.pages import PagesError, first_page, merge_ranges, normalize_pages, parse_pages
+from app.services.pages import PagesError, first_page, format_pages, merge_ranges, parse_pages
 
 
 @pytest.mark.parametrize(
@@ -40,8 +40,8 @@ def test_parse_pages_rejects_bad_lists(text, message):
 
 
 def test_normalize_and_first_page():
-    assert normalize_pages(" 18 , 12-15", 28) == "12-15, 18"
-    assert normalize_pages("4-4", 28) == "4"
+    assert format_pages(parse_pages(" 18 , 12-15", 28)) == "12-15, 18"
+    assert format_pages(parse_pages("4-4", 28)) == "4"
     assert first_page("12-15, 18") == 12
     assert first_page("") == 1
 

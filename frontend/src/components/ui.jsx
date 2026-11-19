@@ -26,7 +26,6 @@ export function buttonClass(variant = "primary", size = "md", extra = "") {
 export function Button({ variant = "primary", size = "md", className = "", ...props }) {
   return <button type="button" className={buttonClass(variant, size, className)} {...props} />;
 }
-export const PixelButton = Button;
 
 /* ---------- cards ---------- */
 
@@ -63,7 +62,6 @@ export function Card({
     </Tag>
   );
 }
-export const PixelCard = Card;
 
 /** A small pixel square holding an icon. */
 export function IconBadge({ icon: Icon, tone = "accent" }) {
@@ -202,7 +200,7 @@ export function FormError({ children }) {
 
 /* ---------- people and brand ---------- */
 
-export function initialsOf(name = "") {
+function initialsOf(name = "") {
   const parts = name
     .replace(/^(dr|prof|assoc)\.?\s+/gi, "")
     .trim()

@@ -6,7 +6,7 @@ import { Card, Chip, IconBadge, inputClass } from "./ui.jsx";
 let nextKey = 1;
 
 /** A blank test row. `key` is a client-side identity for rows that have no id yet. */
-export function emptyTest() {
+function emptyTest() {
   return {
     key: `new-${nextKey++}`,
     name: "",

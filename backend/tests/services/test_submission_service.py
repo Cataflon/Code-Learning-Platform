@@ -3,8 +3,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.core.errors import ConflictError, InvalidDataError
-from app.models import Role, SubmissionStatus, Verdict
-from app.services import submission_service
+from app.models import Enrollment, Role, SubmissionStatus, Verdict
+from app.services import dashboard_service, submission_service
 from tests.fakes import FakeRunner, crash, ok, out_of_memory, timeout
 
 
@@ -114,8 +114,9 @@ def test_summary_lists_verdicts_in_test_order_with_attempt_numbers(db_session, s
     submit(db_session, student, assignment, [ok("x"), ok("0"), ok("21")])
     submit(db_session, student, assignment, [ok("10"), ok("0"), ok("21")])
 
-    submissions = submission_service.list_submissions(db_session, assignment, student)
-    summaries = submission_service.to_summaries(db_session, submissions)
+    summaries = dashboard_service.search_submissions(
+        db_session, assignment, student, "all", None, 1, 20
+    ).items
 
     assert [summary.attempt_number for summary in summaries] == [2, 1]  # newest first
     assert summaries[1].verdicts == [Verdict.wrong_answer, Verdict.passed, Verdict.passed]
@@ -125,11 +126,17 @@ def test_summary_lists_verdicts_in_test_order_with_attempt_numbers(db_session, s
 def test_students_only_list_their_own_submissions(db_session, setup, make_user):
     teacher, student, assignment = setup
     other = make_user(Role.student)
+    db_session.add(Enrollment(user_id=other.id, course_id=assignment.course_id))
+    db_session.commit()
     submit(db_session, student, assignment, [ok("10"), ok("0"), ok("21")])
     submit(db_session, other, assignment, [ok("10"), ok("0"), ok("21")])
 
-    assert len(submission_service.list_submissions(db_session, assignment, student)) == 1
-    assert len(submission_service.list_submissions(db_session, assignment, teacher)) == 2
+    def total(viewer):
+        return dashboard_service.search_submissions(
+            db_session, assignment, viewer, "all", None, 1, 20
+        ).total
+
+    assert (total(student), total(teacher)) == (1, 2)
 
 
 def test_no_attempts_left_raises_conflict(db_session, setup):

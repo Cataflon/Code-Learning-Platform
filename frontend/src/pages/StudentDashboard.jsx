@@ -36,7 +36,7 @@ function nextToSolve(assignments) {
   return assignments.find((a) => a.status === "open" && a.best_score !== 100) ?? null;
 }
 
-export function greeting(now = new Date()) {
+function greeting(now = new Date()) {
   const hour = now.getHours();
   if (hour < 5 || hour >= 18) return "Good evening";
   if (hour < 12) return "Good morning";

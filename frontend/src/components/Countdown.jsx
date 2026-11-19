@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 const SHOW_WITHIN_MS = 72 * 3600 * 1000;
 
-export function timeLeft(due, now = Date.now()) {
+function timeLeft(due, now = Date.now()) {
   const ms = new Date(due).getTime() - now;
   if (!(ms > 0) || ms > SHOW_WITHIN_MS) return null;
   const total = Math.floor(ms / 1000);

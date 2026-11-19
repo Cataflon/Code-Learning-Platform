@@ -18,7 +18,7 @@ function levelOf(count, max) {
  * Build the grid: `weeks` columns ending with the current week, rows Monday..Sunday.
  * Days after `today` are null. Dates are compared as UTC days, like the API reports them.
  */
-export function buildActivityGrid(days, weeks, today = new Date()) {
+function buildActivityGrid(days, weeks, today = new Date()) {
   const counts = new Map(days.map((day) => [day.date, day.count]));
   const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
   const mondayOffset = (end.getUTCDay() + 6) % 7; // Monday = 0

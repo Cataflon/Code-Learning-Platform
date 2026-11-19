@@ -12,7 +12,7 @@ import { FileBadge } from "./MaterialBits.jsx";
 import { Button, Card, CardHeader, Chip, FormError } from "./ui.jsx";
 import { plural } from "../lib/format.js";
 
-export const POLL_MS = 2000;
+const POLL_MS = 2000;
 
 const PHASES = {
   queued: "Waiting to start",
@@ -26,7 +26,7 @@ export function useAiConfig() {
 }
 
 /** One generation job, polled every 2 seconds until it is done or failed. */
-export function useGenerationJob(jobId, interval = POLL_MS) {
+function useGenerationJob(jobId, interval = POLL_MS) {
   return useQuery({
     queryKey: ["generation-job", jobId],
     queryFn: () => aiApi.getGenerationJob(jobId),

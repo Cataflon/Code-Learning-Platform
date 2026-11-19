@@ -4,7 +4,7 @@ import logging
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.errors import (
@@ -140,21 +140,6 @@ def get_submission(db: Session, submission_id: int) -> Submission:
     if submission is None:
         raise NotFoundError("Submission not found")
     return submission
-
-
-def list_submissions(
-    db: Session, assignment: Assignment, viewer: User, limit: int = 100, offset: int = 0
-) -> list[Submission]:
-    """Student: only their own attempts. Teacher: everyone's. Newest first."""
-    query = (
-        select(Submission)
-        .where(Submission.assignment_id == assignment.id)
-        .options(selectinload(Submission.results), selectinload(Submission.student))
-    )
-    if viewer.role == Role.student:
-        query = query.where(Submission.student_id == viewer.id)
-    query = query.order_by(Submission.created_at.desc(), Submission.id.desc())
-    return list(db.scalars(query.limit(limit).offset(offset)))
 
 
 def attempt_numbers(db: Session, submissions: list[Submission]) -> dict[int, int]:

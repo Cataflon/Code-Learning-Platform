@@ -40,9 +40,6 @@ class FileStore:
         """Where a stored file is, for serving it."""
         return self._path(name)
 
-    def exists(self, name: str) -> bool:
-        return self._path(name).is_file()
-
     def delete(self, name: str) -> None:
         """Remove a stored file; a file that is already gone is not an error."""
         with contextlib.suppress(FileNotFoundError):

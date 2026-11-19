@@ -8,7 +8,7 @@ function isToday(value) {
 }
 
 /** The line under the student's name: what is happening or what went wrong. */
-export function describeSubmission(submission) {
+function describeSubmission(submission) {
   if (submission.status === "queued") return { text: "waiting in the queue", tone: "text-blue" };
   if (submission.status === "running") {
     const done = submission.verdicts.filter((verdict) => verdict != null).length;

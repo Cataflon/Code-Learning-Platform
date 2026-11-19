@@ -2,7 +2,7 @@ import { Bar, BarChart, Cell, LabelList, ResponsiveContainer, XAxis, YAxis } fro
 
 import { Chip } from "./ui.jsx";
 
-export const LEVELS = {
+const LEVELS = {
   review: { label: "Review", tone: "bad", color: "#ff6684" },
   progress: { label: "In progress", tone: "warn", color: "#ffbe4f" },
   mastered: { label: "Mastered", tone: "ok", color: "#5ee08c" },

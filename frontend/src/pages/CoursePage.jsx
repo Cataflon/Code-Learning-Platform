@@ -42,7 +42,7 @@ function describe(assignment) {
 }
 
 /** Stacked bar: students who passed all tests, some tests, no test. */
-export function ResultBar({ buckets, submitted, enrolled }) {
+function ResultBar({ buckets, submitted, enrolled }) {
   const total = Math.max(1, submitted);
   const width = (count) => `${(count / total) * 100}%`;
   return (

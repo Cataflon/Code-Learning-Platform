@@ -55,10 +55,6 @@ def format_pages(ranges: Ranges) -> str:
     return ", ".join(f"{a}" if a == b else f"{a}-{b}" for a, b in ranges)
 
 
-def normalize_pages(text: str | None, page_count: int) -> str:
-    return format_pages(parse_pages(text, page_count))
-
-
 def first_page(text: str | None) -> int:
     """Where a link opens: the first page of the list, or page 1."""
     match = re.search(r"\d+", text or "")

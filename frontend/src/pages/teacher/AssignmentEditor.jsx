@@ -52,7 +52,7 @@ function detailsPayload(details) {
   };
 }
 
-export async function saveAssignment(assignmentId, details, tests, originalIds, extra = {}) {
+async function saveAssignment(assignmentId, details, tests, originalIds, extra = {}) {
   await assignmentsApi.updateAssignment(assignmentId, { ...detailsPayload(details), ...extra });
   const keptIds = new Set(tests.filter((row) => row.id != null).map((row) => row.id));
   for (const id of originalIds) {
